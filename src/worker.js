@@ -4,6 +4,26 @@ const TRANSLATION_CACHE_MAX = 3000;
 const translationCache = new Map();
 const translationInFlight = new Map();
 
+// Per-isolate request pacing. This reduces bursts but does not remove Google's limits.
+const GOOGLE_MIN_REQUEST_GAP_MS = 700;
+let googleRequestQueue = Promise.resolve();
+let googleLastRequestAt = 0;
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+function queuedGoogleFetch(url) {
+  const run = googleRequestQueue.then(async () => {
+    const waitMs = Math.max(0, GOOGLE_MIN_REQUEST_GAP_MS - (Date.now() - googleLastRequestAt));
+    if (waitMs) await sleep(waitMs);
+    googleLastRequestAt = Date.now();
+    return fetch(url, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(7000)
+    });
+  });
+  googleRequestQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
+
 async function translateWithProviders(text, target, env) {
   // Google Translate public web endpoint only. Unofficial and may be rate-limited or changed.
   const endpoint = new URL('https://translate.googleapis.com/translate_a/single');
@@ -13,10 +33,23 @@ async function translateWithProviders(text, target, env) {
   endpoint.searchParams.set('dt', 't');
   endpoint.searchParams.set('q', text);
 
-  const upstream = await fetch(endpoint.toString(), {
-    headers: { 'Accept': 'application/json' },
-    signal: AbortSignal.timeout(5000)
-  });
+  let upstream;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    upstream = await queuedGoogleFetch(endpoint.toString());
+    if (upstream.status !== 429 || attempt === 2) break;
+
+    // Respect Retry-After where provided; otherwise use exponential backoff.
+    const retryAfter = upstream.headers.get('Retry-After');
+    let waitMs = 1500 * (2 ** attempt);
+    if (retryAfter) {
+      const seconds = Number(retryAfter);
+      const retryDate = Date.parse(retryAfter);
+      if (Number.isFinite(seconds)) waitMs = seconds * 1000;
+      else if (Number.isFinite(retryDate)) waitMs = Math.max(0, retryDate - Date.now());
+    }
+    await upstream.body?.cancel().catch(() => {});
+    await sleep(Math.min(10000, Math.max(1000, waitMs)));
+  }
   if (!upstream.ok) throw new Error('Google public endpoint HTTP ' + upstream.status);
   const data = await upstream.json();
   const translatedText = Array.isArray(data?.[0])
@@ -77,7 +110,7 @@ export default {
         });
       } catch (error) {
         return Response.json({
-          error: '모든 번역 서비스에 연결하지 못했습니다. API 키, 결제/무료 한도, 네트워크를 확인하세요.',
+          error: 'Google 번역 서비스에 연결하지 못했습니다. 잠시 기다린 뒤 다시 시도하세요.',
           details: [String(error?.message || error)]
         }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
       } finally {
