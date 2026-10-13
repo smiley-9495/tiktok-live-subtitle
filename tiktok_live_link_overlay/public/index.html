@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1020"><title>TikTok LIVE 번역 자막</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#131a2b;--panel2:#192237;--text:#eef3ff;--muted:#9aa8c4;--border:#29344d;--accent:#8b5cf6;--bad:#fb7185;--ok:#34d399}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Malgun Gothic",system-ui,sans-serif}button,select,input{font:inherit}button{cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:10px;padding:10px 14px;font-weight:700}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:linear-gradient(135deg,#8b5cf6,#6366f1);border:0;color:white}.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--panel)}.brand{font-weight:850;font-size:18px}.sub{font-size:11px;color:var(--muted);letter-spacing:.12em;margin-top:4px}.pill{border:1px solid var(--border);border-radius:99px;padding:7px 11px;color:var(--muted);font-size:12px}.layout{max-width:1180px;margin:auto;padding:24px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:18px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:16px}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.heading{font-size:26px;margin:0 0 6px}.muted,.helper{color:var(--muted);font-size:12px;line-height:1.65}.preview{background:rgba(8,10,14,1);border-radius:14px;min-height:240px;padding:22px;display:flex;flex-direction:column;justify-content:flex-end;gap:9px;overflow-wrap:anywhere}.line{font-size:clamp(16px,1.7vw,24px);font-weight:800;line-height:1.4;text-shadow:1px 2px 4px #000,0 0 2px #000;overflow-wrap:anywhere}.tag{display:inline-block;min-width:52px;font-size:.62em;color:#baf7ff;margin-right:8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.field{display:flex;flex-direction:column;gap:8px;margin:12px 0}.field label{font-size:12px;color:var(--muted);font-weight:700}.field select,.field input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px}.field input[type=range]{width:100%;accent-color:var(--accent)}.checks{display:flex;gap:8px;flex-wrap:wrap}.check{display:flex;align-items:center;gap:7px;border:1px solid var(--border);padding:9px 11px;border-radius:10px;font-size:12px}.status{padding:12px 14px;background:var(--panel2);border-radius:12px;margin-top:14px;font-size:12px;line-height:1.55}.status.error{border:1px solid var(--bad)}.status.good{border:1px solid #23694f}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px}.stat{background:var(--panel2);border-radius:12px;padding:12px}.stat small{color:var(--muted)}.stat strong{display:block;margin-top:5px}.hide{display:none!important}.transcript{font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;max-height:170px;overflow:auto;color:#d8e1f5}.foot{max-width:1180px;margin:0 auto;padding:0 24px 24px;color:var(--muted);font-size:12px;line-height:1.7}@media(max-width:850px){.layout{grid-template-columns:1fr;padding:14px}.topbar{padding:15px}.foot{padding:0 14px 20px}}
+</style></head><body>
+<header class="topbar"><div><div class="brand">TikTok LIVE <span style="color:#a99afb">번역 자막 스튜디오</span></div><div class="sub">PUBLIC BROWSER VERSION · 개인 마이크 처리</div></div><span class="pill" id="topState">준비 중</span></header>
+<main class="layout"><section>
+<div class="head"><div><h1 class="heading">실시간 번역 자막</h1><p class="muted">각 방문자의 브라우저에서 자기 마이크 음성을 인식하고 번역합니다.</p></div><span class="pill">브라우저 실행</span></div>
+<div class="panel"><div class="head"><div><strong>방송 오버레이 미리보기</strong><div class="helper">오버레이 창을 LIVE Studio에서 창 캡처로 추가하세요.</div></div><button id="clearBtn">자막 지우기</button></div>
+<div class="preview" id="preview"><div class="line" data-line="ko"><span class="tag">KO</span><span id="pv-ko">마이크 입력 대기 중…</span></div><div class="line" data-line="en"><span class="tag">EN</span><span id="pv-en"></span></div><div class="line" data-line="zh-CN"><span class="tag">中文</span><span id="pv-zh-CN"></span></div><div class="line" data-line="ja"><span class="tag">日本語</span><span id="pv-ja"></span></div></div>
+<div class="toolbar"><button class="primary" id="startBtn">▶ 자막 시작</button><button id="stopBtn" disabled>■ 중지</button><button id="overlayBtn">↗ 오버레이 열기</button></div>
+<div class="status" id="status"><strong id="statusTitle">사용 준비 완료</strong><div id="statusText">자막 시작을 누른 뒤 마이크 권한을 허용하세요.</div></div>
+<div class="stats"><div class="stat"><small>인식 언어</small><strong>한국어</strong></div><div class="stat"><small>번역 언어</small><strong>최대 3개</strong></div><div class="stat"><small>번역 완료</small><strong id="reqCount">0회</strong></div></div></div>
+<div class="panel"><strong>최근 인식 문장</strong><p class="helper">인식된 문장이 여기에 표시됩니다.</p><div class="transcript" id="transcript">아직 인식된 문장이 없습니다.</div></div>
+</section><aside>
+<div class="panel"><strong>번역 언어</strong><div class="field"><label>번역할 언어를 선택하세요</label><div class="checks"><label class="check"><input type="checkbox" data-lang="ko" checked> 한국어 자막</label><label class="check"><input type="checkbox" data-lang="en" checked> 영어</label><label class="check"><input type="checkbox" data-lang="zh-CN" checked> 중국어 간체</label><label class="check"><input type="checkbox" data-lang="ja" checked> 일본어</label></div></div><p class="helper">선택한 언어만 번역 요청을 보내므로 무료 번역 서비스의 사용량을 줄일 수 있습니다.</p></div>
+<div class="panel"><strong>오버레이 배경 투명도</strong><div class="field"><label for="transparencyRange">투명도 <span id="transparencyValue">0%</span></label><input id="transparencyRange" type="range" min="0" max="100" step="5" value="0"><div class="helper">0%는 불투명한 검정 배경, 100%는 완전 투명 배경을 뜻합니다. 글자는 선명하게 유지됩니다.</div></div></div>
+<div class="panel"><strong>마이크 권한</strong><p class="helper">Chrome 또는 Edge에서 HTTPS 주소로 접속해야 합니다. 자막 시작을 누르고 브라우저의 마이크 권한을 허용하세요. 사용할 입력 장치는 브라우저/Windows의 기본 마이크 설정을 따릅니다.</p><button id="micHelp">마이크 설정 안내</button></div>
+<div class="panel"><strong>링크형 오버레이</strong><p class="helper">아래 주소를 복사해 TikTok LIVE Studio의 브라우저 소스 URL에 붙여넣으세요. 사이트와 방송 소스가 같은 방 코드를 통해 실시간 자막을 공유합니다.</p><div class="field"><label for="overlayLink">오버레이 URL</label><input id="overlayLink" type="text" readonly style="width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px"></div><div class="toolbar"><button id="copyOverlayLinkBtn" class="primary">링크 복사</button><button id="openOverlayLinkBtn">미리보기 열기</button></div><p class="helper" id="linkStatus">사이트 배포 후 이 주소를 복사해 사용하세요.</p></div><div class="panel"><strong>방송에 자막 넣기</strong><ol class="helper" style="padding-left:18px;line-height:1.9"><li>자막 시작을 누르고 마이크 권한을 허용합니다.</li><li>위의 오버레이 URL을 복사합니다.</li><li>TikTok LIVE Studio에서 브라우저 소스를 추가하고 URL에 붙여넣습니다.</li><li>브라우저 소스의 배경/크기 설정은 LIVE Studio에서 조절하세요.</li></ol></div>
+<div class="panel"><strong>중요 안내</strong><p class="helper">음성 인식은 브라우저의 Web Speech 기능을 사용합니다. Chrome/Edge 지원 여부와 인터넷 상태에 따라 달라질 수 있습니다. 번역은 무료 공개 MyMemory API를 사용하므로 사용량 제한, 지연 또는 장애가 발생할 수 있습니다. 사이트 운영자는 마이크 오디오를 자체 서버로 전송하지 않지만 브라우저 음성 인식 엔진의 처리 정책은 해당 브라우저 제공자에 따릅니다.</p></div>
+</aside></main><footer class="foot">이 웹사이트는 별도의 Python 서버 없이 정적 호스팅에서 동작하도록 제작되었습니다. 방문자별 자막과 설정은 각 브라우저 안에서 분리됩니다. 무료 번역 API는 무제한/상업적 서비스가 보장되지 않습니다.</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+const LANGS = ['en', 'zh-CN', 'ja'];
+const ALL_LANGS = ['ko', ...LANGS];
+const LABELS = { en: '영어', 'zh-CN': '중국어', ja: '일본어' };
+const CACHE_LIMIT = 250;
+const MIN_TRANSLATION_GAP_MS = 1100;
+let recognition = null;
+let running = false;
+let shouldRestart = false;
+let restartTimer = null;
+let translationQueue = Promise.resolve();
+let translatedCount = 0;
+let lastRequestAt = 0;
+let lastFinalText = '';
+let lastFinalAt = 0;
+let activeRunId = 0;
+const cache = new Map();
+let overlayWindow = null;
+let subtitleChannel = null;
+let relaySocket = null;
+let relayRetryTimer = null;
+let relayRetryDelay = 800;
+const ROOM_STORAGE_KEY = 'tiktok-live-subtitle-room-v1';
+function getRoomId() {
+  try {
+    let id = localStorage.getItem(ROOM_STORAGE_KEY);
+    if (!id || !/^[a-f0-9-]{20,80}$/i.test(id)) {
+      id = (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(16) + '-' + Math.random().toString(16).slice(2) + '-' + Math.random().toString(16).slice(2)));
+      localStorage.setItem(ROOM_STORAGE_KEY, id);
+    }
+    return id;
+  } catch (_) { return (location.host + '-default').replace(/[^a-z0-9-]/gi, '').slice(0, 50) || 'default-room'; }
+}
+const roomId = getRoomId();
+function overlayUrl() { const u = new URL('overlay.html', location.href); u.searchParams.set('room', roomId); return u.href; }
+function connectRelay() {
+  if (relaySocket && (relaySocket.readyState === WebSocket.OPEN || relaySocket.readyState === WebSocket.CONNECTING)) return;
+  const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${scheme}//${location.host}/ws/${encodeURIComponent(roomId)}`;
+  try {
+    relaySocket = new WebSocket(wsUrl);
+    relaySocket.onopen = () => {
+      relayRetryDelay = 800;
+      $('linkStatus').textContent = '실시간 연결됨 · 이 방의 오버레이 링크가 활성화되었습니다.';
+      sendOverlayMessage('settings', currentSettings());
+      const lines = {}; for (const lang of ALL_LANGS) lines[lang] = $('pv-' + lang).textContent; lines.at = Date.now(); sendOverlayMessage('lines', lines);
+    };
+    relaySocket.onclose = () => {
+      $('linkStatus').textContent = '실시간 연결 재시도 중…';
+      clearTimeout(relayRetryTimer);
+      relayRetryTimer = setTimeout(connectRelay, relayRetryDelay);
+      relayRetryDelay = Math.min(10000, relayRetryDelay * 1.7);
+    };
+    relaySocket.onerror = () => { try { relaySocket.close(); } catch (_) {} };
+  } catch (_) { clearTimeout(relayRetryTimer); relayRetryTimer = setTimeout(connectRelay, 2500); }
+}
+try { if ('BroadcastChannel' in window) subtitleChannel = new BroadcastChannel('tiktok-live-subtitle-sync-v1'); } catch (_) {}
+
+function safeStatus(title, message, kind = '') {
+  $('statusTitle').textContent = title;
+  $('statusText').textContent = message;
+  $('status').className = 'status ' + kind;
+  $('topState').textContent = title;
+}
+function currentSettings() {
+  return {
+    font: 24,
+    transparency: Number($('transparencyRange')?.value ?? 0),
+    langs: Object.fromEntries([...document.querySelectorAll('[data-lang]')].map((el) => [el.dataset.lang, el.checked]))
+  };
+}
+function applyTransparency() {
+  const value = Number($('transparencyRange').value);
+  $('transparencyValue').textContent = value + '%';
+  const opacity = Math.max(0, Math.min(1, 1 - value / 100));
+  $('preview').style.backgroundColor = `rgba(8, 10, 14, ${opacity})`;
+}
+function sendOverlayMessage(type, payload) {
+  const message = { channel: 'tiktok-live-subtitle-sync-v1', type, payload, at: Date.now() };
+  try { if (subtitleChannel) subtitleChannel.postMessage(message); } catch (_) {}
+  try { if (overlayWindow && !overlayWindow.closed) overlayWindow.postMessage(message, window.location.origin); } catch (_) {}
+  try { if (relaySocket && relaySocket.readyState === WebSocket.OPEN) relaySocket.send(JSON.stringify(message)); } catch (_) {}
+}
+function saveSettings() {
+  const settings = currentSettings();
+  try { localStorage.setItem('subtitleSettings', JSON.stringify(settings)); } catch (_) {}
+  sendOverlayMessage('settings', settings);
+  document.querySelectorAll('[data-lang]').forEach((el) => {
+    const row = document.querySelector(`[data-line="${el.dataset.lang}"]`);
+    if (row) row.classList.toggle('hide', !el.checked);
+  });
+  applyTransparency();
+}
+function publishLines() {
+  const lines = {};
+  for (const lang of ALL_LANGS) lines[lang] = $('pv-' + lang).textContent;
+  lines.at = Date.now();
+  try { localStorage.setItem('subtitleLines', JSON.stringify(lines)); } catch (_) {}
+  sendOverlayMessage('lines', lines);
+}
+function renderLine(lang, text) {
+  const node = $('pv-' + lang);
+  if (!node) return;
+  node.textContent = text || '';
+  publishLines();
+}
+function decodeEntities(value) {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = String(value || '');
+  return textarea.value;
+}
+function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(url, { ...options, signal: controller.signal, mode: 'cors', cache: 'no-store' }); }
+  finally { clearTimeout(timer); }
+}
+async function translate(text, target) {
+  const cleanText = String(text || '').trim().slice(0, 450);
+  if (!cleanText) return '';
+  const key = target + '|' + cleanText;
+  if (cache.has(key)) return cache.get(key);
+  const waitMs = MIN_TRANSLATION_GAP_MS - (Date.now() - lastRequestAt);
+  if (waitMs > 0) await sleep(waitMs);
+  lastRequestAt = Date.now();
+  const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(cleanText) + '&langpair=' + encodeURIComponent('ko|' + target);
+  let lastError;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, {}, 14000);
+      if (response.status === 429) throw new Error('무료 번역 요청 한도(429)에 도달했습니다. 잠시 뒤 다시 시도하세요.');
+      if (!response.ok) throw new Error('번역 서버 HTTP ' + response.status);
+      const data = await response.json();
+      const apiStatus = Number(data && data.responseStatus);
+      if (apiStatus && apiStatus !== 200) {
+        const detail = String(data.responseDetails || '번역 서비스에서 오류를 반환했습니다.');
+        throw new Error(detail);
+      }
+      const result = decodeEntities(data && data.responseData && data.responseData.translatedText).trim();
+      if (!result) throw new Error('번역 결과가 비어 있습니다.');
+      cache.set(key, result);
+      if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
+      return result;
+    } catch (error) {
+      lastError = error;
+      const message = String(error && error.message || error);
+      if (message.includes('429') || message.toLowerCase().includes('limit') || attempt === 1) break;
+      await sleep(700);
+    }
+  }
+  throw lastError || new Error('번역에 실패했습니다.');
+}
+function enqueueTranslations(text, runId) {
+  translationQueue = translationQueue.then(async () => {
+    const targets = [...document.querySelectorAll('[data-lang]:checked')].map((el) => el.dataset.lang).filter((lang) => LANGS.includes(lang));
+    for (const target of targets) {
+      if (!running || runId !== activeRunId) return;
+      try {
+        const result = await translate(text, target);
+        if (!running || runId !== activeRunId) return;
+        renderLine(target, result);
+        translatedCount += 1;
+        $('reqCount').textContent = translatedCount + '회';
+        safeStatus('번역 완료', LABELS[target] + ' 번역을 완료했습니다.', 'good');
+      } catch (error) {
+        const message = String(error && error.message || error);
+        safeStatus('번역 오류', LABELS[target] + ': ' + message, 'error');
+        if (message.includes('429') || message.toLowerCase().includes('limit') || message.includes('한도')) return;
+      }
+    }
+  }).catch((error) => safeStatus('번역 오류', String(error && error.message || error), 'error'));
+}
+function handleFinal(text, runId) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean || !running || runId !== activeRunId) return;
+  // Avoid only immediate duplicate recognition; allow the same phrase again later.
+  if (clean === lastFinalText && Date.now() - lastFinalAt < 3500) return;
+  lastFinalText = clean;
+  lastFinalAt = Date.now();
+  renderLine('ko', clean);
+  const old = $('transcript').textContent;
+  $('transcript').textContent = (clean + '\n' + (old === '아직 인식된 문장이 없습니다.' ? '' : old)).slice(0, 1800);
+  enqueueTranslations(clean, runId);
+}
+function clearRestartTimer() {
+  if (restartTimer) clearTimeout(restartTimer);
+  restartTimer = null;
+}
+function scheduleRestart(runId) {
+  clearRestartTimer();
+  if (!shouldRestart || !running || runId !== activeRunId) return;
+  restartTimer = setTimeout(() => {
+    if (!shouldRestart || !running || runId !== activeRunId || !recognition) return;
+    try { recognition.start(); }
+    catch (_) { scheduleRestart(runId); }
+  }, 650);
+}
+function start() {
+  if (!SpeechRecognitionAPI) {
+    safeStatus('브라우저 미지원', '최신 Chrome 또는 Edge에서 HTTPS 주소로 접속해 주세요.', 'error');
+    return;
+  }
+  if (running) return;
+  clearRestartTimer();
+  activeRunId += 1;
+  const runId = activeRunId;
+  lastFinalText = '';
+  lastFinalAt = 0;
+  recognition = new SpeechRecognitionAPI();
+  recognition.lang = 'ko-KR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.maxAlternatives = 1;
+  shouldRestart = true;
+  running = true;
+  recognition.onstart = () => {
+    if (runId === activeRunId) safeStatus('마이크 인식 중', '한국어 음성을 듣고 있습니다.', 'good');
+  };
+  recognition.onresult = (event) => {
+    if (!running || runId !== activeRunId) return;
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const item = event.results[i];
+      const text = item && item[0] ? item[0].transcript.trim() : '';
+      if (item.isFinal) handleFinal(text, runId);
+      else interim += text;
+    }
+    if (interim) $('topState').textContent = '인식 중: ' + interim.slice(0, 24);
+  };
+  recognition.onerror = (event) => {
+    if (runId !== activeRunId) return;
+    const code = event && event.error || 'unknown';
+    const messages = {
+      'not-allowed': '브라우저의 마이크 권한을 허용하세요.',
+      'service-not-allowed': '이 브라우저/계정에서 음성 인식 서비스가 차단되었습니다.',
+      'audio-capture': '마이크를 찾을 수 없습니다. Windows 기본 입력 장치를 확인하세요.',
+      'network': '브라우저 음성 인식 네트워크 오류입니다. 인터넷 연결을 확인하세요.',
+      'no-speech': '음성이 감지되지 않았습니다. 마이크 가까이에서 말해 보세요.',
+      'language-not-supported': '한국어 음성 인식이 지원되지 않습니다.'
+    };
+    safeStatus('음성 인식 알림', messages[code] || ('음성 인식 오류: ' + code), ['not-allowed','service-not-allowed','audio-capture','language-not-supported'].includes(code) ? 'error' : '');
+    if (['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'].includes(code)) {
+      shouldRestart = false;
+      running = false;
+      clearRestartTimer();
+      $('startBtn').disabled = false;
+      $('stopBtn').disabled = true;
+    }
+  };
+  recognition.onend = () => {
+    if (runId !== activeRunId) return;
+    if (shouldRestart && running) scheduleRestart(runId);
+    else {
+      recognition = null;
+      $('startBtn').disabled = false;
+      $('stopBtn').disabled = true;
+    }
+  };
+  try {
+    recognition.start();
+    $('startBtn').disabled = true;
+    $('stopBtn').disabled = false;
+    saveSettings();
+  } catch (error) {
+    shouldRestart = false;
+    running = false;
+    recognition = null;
+    $('startBtn').disabled = false;
+    $('stopBtn').disabled = true;
+    safeStatus('시작 실패', String(error && error.message || error), 'error');
+  }
+}
+function stop() {
+  shouldRestart = false;
+  running = false;
+  activeRunId += 1;
+  clearRestartTimer();
+  const oldRecognition = recognition;
+  recognition = null;
+  if (oldRecognition) {
+    oldRecognition.onend = null;
+    oldRecognition.onresult = null;
+    try { oldRecognition.stop(); } catch (_) { try { oldRecognition.abort(); } catch (_e) {} }
+  }
+  $('startBtn').disabled = false;
+  $('stopBtn').disabled = true;
+  safeStatus('중지됨', '마이크 인식이 중지되었습니다.');
+}
+$('startBtn').addEventListener('click', start);
+$('stopBtn').addEventListener('click', stop);
+$('overlayLink').value = overlayUrl();
+connectRelay();
+$('copyOverlayLinkBtn').addEventListener('click', async () => {
+  const url = overlayUrl();
+  try { await navigator.clipboard.writeText(url); $('linkStatus').textContent = '오버레이 링크를 복사했습니다. LIVE Studio 브라우저 소스에 붙여넣으세요.'; }
+  catch (_) { $('overlayLink').focus(); $('overlayLink').select(); $('linkStatus').textContent = '주소를 선택했어요. Ctrl+C로 복사하세요.'; }
+});
+$('openOverlayLinkBtn').addEventListener('click', () => window.open(overlayUrl(), '_blank', 'noopener'));
+$('overlayBtn').addEventListener('click', () => {
+  const url = overlayUrl();
+  const win = window.open(url, 'tiktokSubtitleOverlay', 'width=1000,height=320');
+  overlayWindow = win;
+  if (win) {
+    try { win.addEventListener('load', () => { sendOverlayMessage('settings', currentSettings()); const lines = {}; for (const lang of ALL_LANGS) lines[lang] = $('pv-' + lang).textContent; lines.at = Date.now(); sendOverlayMessage('lines', lines); }); } catch (_) {}
+    sendOverlayMessage('settings', currentSettings());
+    const lines = {}; for (const lang of ALL_LANGS) lines[lang] = $('pv-' + lang).textContent; lines.at = Date.now(); sendOverlayMessage('lines', lines);
+  }
+  if (!win) safeStatus('팝업 차단됨', '브라우저에서 이 사이트의 팝업을 허용한 뒤 다시 눌러주세요.', 'error');
+});
+$('clearBtn').addEventListener('click', () => {
+  for (const lang of ['ko', ...LANGS]) renderLine(lang, '');
+  $('transcript').textContent = '아직 인식된 문장이 없습니다.';
+  lastFinalText = '';
+  lastFinalAt = 0;
+});
+$('micHelp').addEventListener('click', () => alert('Chrome/Edge 주소창 왼쪽 아이콘 → 사이트 설정 → 마이크 허용. 입력 장치는 Windows 설정 → 시스템 → 소리 → 입력에서 기본 장치로 선택하세요.'));
+document.querySelectorAll('[data-lang]').forEach((el) => el.addEventListener('change', saveSettings));
+$('transparencyRange').addEventListener('input', saveSettings);
+window.addEventListener('beforeunload', () => { stop(); try { if (relaySocket) relaySocket.close(); } catch (_) {} });
+try { const saved = JSON.parse(localStorage.getItem('subtitleSettings') || '{}'); if (Number.isFinite(Number(saved.transparency))) $('transparencyRange').value = String(Math.max(0, Math.min(100, Number(saved.transparency)))); if (saved.langs && typeof saved.langs === 'object') document.querySelectorAll('[data-lang]').forEach((el) => { if (typeof saved.langs[el.dataset.lang] === 'boolean') el.checked = saved.langs[el.dataset.lang]; }); } catch (_) {}
+saveSettings();
+
+</script></body></html>
