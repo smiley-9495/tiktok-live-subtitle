@@ -1,0 +1,16 @@
+name = "tiktok-live-subtitle-link"
+main = "src/worker.js"
+compatibility_date = "2026-10-14"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/ws/*"]
+
+[[durable_objects.bindings]]
+name = "SUBTITLE_ROOMS"
+class_name = "SubtitleRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SubtitleRoom"]
