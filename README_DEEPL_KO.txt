@@ -1,0 +1,1 @@
+DeepL is now an optional fallback, not the primary translation provider. To enable it as a fallback, add a Cloudflare Secret named DEEPL_API_KEY. See README_MICROSOFT_TRANSLATOR_KO.txt for the primary Microsoft Translator setup.

@@ -53,3 +53,6 @@ TikTok LIVE 번역 자막 - HTML 화면 + 링크형 오버레이 (내 PC에 Node
 
 검증 안내
 - 실제 Cloudflare 계정에 배포하거나 TikTok LIVE Studio에서 실시간 동작을 확인한 것은 아닙니다. 처음 배포한 뒤 자막 시작, 번역, 오버레이 URL 표시를 순서대로 테스트하세요. 어떤 외부 서비스 조합도 오류가 절대 없다고 보장할 수는 없습니다.
+
+
+Microsoft Translator 우선 설정은 README_MICROSOFT_TRANSLATOR_KO.txt를 확인하세요. Microsoft API 키는 GitHub에 넣지 말고 Cloudflare Secret MICROSOFT_TRANSLATOR_KEY로 설정하세요.
