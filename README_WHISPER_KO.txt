@@ -1,6 +1,6 @@
 Cloudflare Workers AI Whisper 적용 버전
 
-이 버전은 기존 Web Speech API 음성인식을 제거하고, 브라우저 마이크 오디오를 Cloudflare Worker로 보내 Workers AI Whisper large-v3-turbo로 한국어 텍스트로 변환합니다. 인식 결과는 기존 Google 공개 번역 스크립트로 전달됩니다. Google 번역 외의 번역 서비스는 추가하지 않았습니다.
+이 버전은 기존 Web Speech API 음성인식을 제거하고, 브라우저 마이크 오디오를 Cloudflare Worker로 보내 Workers AI Whisper로 한국어 텍스트로 변환합니다. 인식 결과는 기존 Google 공개 번역 스크립트로 전달됩니다. Google 번역 외의 번역 서비스는 추가하지 않았습니다.
 
 주요 파일
 - public/index.html: 마이크 녹음, 약 6초 단위 오디오 전송, 번역 UI
@@ -23,3 +23,7 @@ GitHub + Cloudflare 적용
 - Workers AI 사용량에 따라 과금 또는 계정 한도가 적용될 수 있습니다. Cloudflare 대시보드에서 현재 가격과 사용량을 확인하세요.
 - Google 번역은 공개 비공식 엔드포인트만 사용하므로 HTTP 429 등 제한이 발생할 수 있습니다. 이를 줄이기 위해 Worker 인스턴스 내 요청 간격을 1.5초로 늘리고, 번역 작업을 직렬화하며, 429 응답은 대기 후 최대 3회 시도하도록 조정했습니다. 브라우저 번역 요청 타임아웃도 40초로 늘렸습니다. 이는 제한을 우회하거나 완전히 없애는 방법은 아니며, 서로 다른 Worker 인스턴스 사이의 전역 제한도 아닙니다.
 - 이 ZIP은 코드 문법과 압축 무결성만 검사했습니다. 실제 Cloudflare 배포, 마이크 녹음, Workers AI 실행 및 LIVE Studio 동작은 사용자의 계정에서 테스트해야 합니다.
+
+
+오디오 입력 형식 오류(5006) 수정 안내
+- 이 버전은 @cf/openai/whisper 모델에 Uint8Array를 숫자 배열로 전달합니다. Base64 문자열로 전달하면 모델 입력 스키마에 따라 5006 형식 오류가 발생할 수 있습니다.

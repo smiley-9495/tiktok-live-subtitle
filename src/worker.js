@@ -81,12 +81,12 @@ export default {
         return Response.json({ error: '오디오 크기는 1바이트~5MB여야 합니다.' }, { status: 413 });
       }
       try {
-        const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
-          audio: [...new Uint8Array(audio)],
+        const result = await env.AI.run('@cf/openai/whisper', {
+          // This model's input schema accepts audio as an array of unsigned 8-bit bytes.
+          // Do not send a base64/string value here; it triggers Workers AI error 5006.
+          audio: Array.from(new Uint8Array(audio)),
           task: 'transcribe',
-          language: 'ko',
-          vad_filter: true,
-          condition_on_previous_text: false
+          language: 'ko'
         });
         const text = String(result?.text || result?.transcription_info?.text || '').trim().slice(0, 1800);
         return Response.json({ text }, { headers: { 'Cache-Control': 'no-store' } });
