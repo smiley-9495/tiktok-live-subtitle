@@ -3,9 +3,16 @@ const TRANSLATION_CACHE_TTL_MS = 30 * 60 * 1000;
 const TRANSLATION_CACHE_MAX = 3000;
 const translationCache = new Map();
 const translationInFlight = new Map();
+// Serialize different translation jobs within each Worker isolate to reduce bursts.
+let translationServiceQueue = Promise.resolve();
+function queuedTranslation(text, target, env) {
+  const run = translationServiceQueue.then(() => translateWithProviders(text, target, env));
+  translationServiceQueue = run.then(() => undefined, () => undefined);
+  return run;
+}
 
 // Per-isolate request pacing. This reduces bursts but does not remove Google's limits.
-const GOOGLE_MIN_REQUEST_GAP_MS = 700;
+const GOOGLE_MIN_REQUEST_GAP_MS = 1500;
 let googleRequestQueue = Promise.resolve();
 let googleLastRequestAt = 0;
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -40,7 +47,7 @@ async function translateWithProviders(text, target, env) {
 
     // Respect Retry-After where provided; otherwise use exponential backoff.
     const retryAfter = upstream.headers.get('Retry-After');
-    let waitMs = 1500 * (2 ** attempt);
+    let waitMs = 2500 * (2 ** attempt);
     if (retryAfter) {
       const seconds = Number(retryAfter);
       const retryDate = Date.parse(retryAfter);
@@ -48,7 +55,7 @@ async function translateWithProviders(text, target, env) {
       else if (Number.isFinite(retryDate)) waitMs = Math.max(0, retryDate - Date.now());
     }
     await upstream.body?.cancel().catch(() => {});
-    await sleep(Math.min(10000, Math.max(1000, waitMs)));
+    await sleep(Math.min(8000, Math.max(1500, waitMs)));
   }
   if (!upstream.ok) throw new Error('Google public endpoint HTTP ' + upstream.status);
   const data = await upstream.json();
@@ -62,6 +69,31 @@ async function translateWithProviders(text, target, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname === '/api/transcribe' && request.method === 'POST') {
+      if (!env.AI) return Response.json({ error: 'Workers AI binding이 설정되지 않았습니다. wrangler.toml의 [ai] binding = \"AI\"를 확인하세요.' }, { status: 503 });
+      const contentType = request.headers.get('Content-Type') || '';
+      if (!contentType.startsWith('audio/')) {
+        return Response.json({ error: '오디오 파일을 보내야 합니다.' }, { status: 415 });
+      }
+      const audio = await request.arrayBuffer();
+      if (!audio.byteLength || audio.byteLength > 5 * 1024 * 1024) {
+        return Response.json({ error: '오디오 크기는 1바이트~5MB여야 합니다.' }, { status: 413 });
+      }
+      try {
+        const result = await env.AI.run('@cf/openai/whisper-large-v3-turbo', {
+          audio: [...new Uint8Array(audio)],
+          task: 'transcribe',
+          language: 'ko',
+          vad_filter: true,
+          condition_on_previous_text: false
+        });
+        const text = String(result?.text || result?.transcription_info?.text || '').trim().slice(0, 1800);
+        return Response.json({ text }, { headers: { 'Cache-Control': 'no-store' } });
+      } catch (error) {
+        return Response.json({ error: 'Whisper 음성인식에 실패했습니다.', details: String(error?.message || error).slice(0, 500) }, { status: 502, headers: { 'Cache-Control': 'no-store' } });
+      }
+    }
 
     if (url.pathname === '/api/translate' && request.method === 'GET') {
       const target = url.searchParams.get('target') || '';
@@ -97,7 +129,7 @@ export default {
         }
       }
 
-      const work = translateWithProviders(text, target, env);
+      const work = queuedTranslation(text, target, env);
       translationInFlight.set(cacheKey, work);
       try {
         const payload = await work;

@@ -14,3 +14,6 @@ class_name = "SubtitleRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SubtitleRoom"]
+
+[ai]
+binding = "AI"

@@ -29,7 +29,7 @@ TikTok LIVE 번역 자막 - 링크형 오버레이 버전
 
 주의
 - 실제 배포와 TikTok LIVE Studio 내 동작은 계정/환경에 따라 확인이 필요합니다. 오류가 절대 발생하지 않는다고 보장할 수는 없습니다.
-- 음성 인식은 Chrome/Edge Web Speech API를 사용합니다. 브라우저 지원/마이크 권한/인터넷에 따라 달라질 수 있고 일부 브라우저는 외부 음성 인식 서비스를 사용할 수 있습니다.
+- 음성 인식은 Cloudflare Workers AI Whisper large-v3-turbo 모델을 사용합니다. 마이크 오디오는 음성인식을 위해 Cloudflare Worker로 전송됩니다. Chrome/Edge에서 HTTPS 접속과 마이크 권한이 필요합니다.
 - 이 버전은 Google 번역 공개 엔드포인트만 사용합니다. 공식적으로 보장된 API가 아니므로 요청 제한, 지연, 장애가 발생할 수 있습니다. 무료 공개 번역 엔드포인트는 요청 제한, 지연, 장애가 발생할 수 있습니다.
 - Cloudflare 무료 사용량 한도/상품 정책은 변경될 수 있습니다. 이용자가 많아지면 요금과 사용량을 확인하세요.
 - 링크를 알고 있는 다른 사람이 같은 room으로 메시지를 보낼 수 있으므로 민감한 내용을 자막 처리하지 마세요.
@@ -41,3 +41,6 @@ Google Cloud Translation + 캐시 설정: README_GOOGLE_CLOUD_TRANSLATION_KO.txt
 
 
 Google 번역 스크립트 단독 사용 버전입니다. 다른 번역 서비스로 대체하지 않습니다. 비공식 공개 엔드포인트라 속도 제한이나 변경이 있을 수 있으며, 실패하면 번역 요청이 실패합니다.
+
+
+Whisper 적용 방법과 주의사항은 README_WHISPER_KO.txt를 확인하세요.

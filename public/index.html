@@ -6,9 +6,9 @@
 <style>
 :root{color-scheme:dark;--bg:#0b1020;--panel:#131a2b;--panel2:#192237;--text:#eef3ff;--muted:#9aa8c4;--border:#29344d;--accent:#8b5cf6;--bad:#fb7185;--ok:#34d399}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Malgun Gothic",system-ui,sans-serif}button,select,input{font:inherit}button{cursor:pointer;border:1px solid var(--border);background:var(--panel2);color:var(--text);border-radius:10px;padding:10px 14px;font-weight:700}button:disabled{opacity:.45;cursor:not-allowed}.primary{background:linear-gradient(135deg,#8b5cf6,#6366f1);border:0;color:white}.topbar{display:flex;align-items:center;justify-content:space-between;padding:18px 24px;border-bottom:1px solid var(--border);background:var(--panel)}.brand{font-weight:850;font-size:18px}.sub{font-size:11px;color:var(--muted);letter-spacing:.12em;margin-top:4px}.pill{border:1px solid var(--border);border-radius:99px;padding:7px 11px;color:var(--muted);font-size:12px}.layout{max-width:1180px;margin:auto;padding:24px;display:grid;grid-template-columns:minmax(0,1.5fr) minmax(280px,.8fr);gap:18px}.panel{background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px;margin-bottom:16px}.head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.heading{font-size:26px;margin:0 0 6px}.muted,.helper{color:var(--muted);font-size:12px;line-height:1.65}.preview{background:rgba(8,10,14,1);border-radius:14px;min-height:240px;padding:22px;display:flex;flex-direction:column;justify-content:flex-end;gap:9px;overflow-wrap:anywhere}.line{font-size:clamp(16px,1.7vw,24px);font-weight:800;line-height:1.4;text-shadow:1px 2px 4px #000,0 0 2px #000;overflow-wrap:anywhere}.tag{display:inline-block;min-width:52px;font-size:.62em;color:#baf7ff;margin-right:8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.field{display:flex;flex-direction:column;gap:8px;margin:12px 0}.field label{font-size:12px;color:var(--muted);font-weight:700}.field select,.field input[type=text]{width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px}.field input[type=range]{width:100%;accent-color:var(--accent)}.checks{display:flex;gap:8px;flex-wrap:wrap}.check{display:flex;align-items:center;gap:7px;border:1px solid var(--border);padding:9px 11px;border-radius:10px;font-size:12px}.status{padding:12px 14px;background:var(--panel2);border-radius:12px;margin-top:14px;font-size:12px;line-height:1.55}.status.error{border:1px solid var(--bad)}.status.good{border:1px solid #23694f}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:14px}.stat{background:var(--panel2);border-radius:12px;padding:12px}.stat small{color:var(--muted)}.stat strong{display:block;margin-top:5px}.hide{display:none!important}.transcript{font-size:13px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;max-height:170px;overflow:auto;color:#d8e1f5}.foot{max-width:1180px;margin:0 auto;padding:0 24px 24px;color:var(--muted);font-size:12px;line-height:1.7}@media(max-width:850px){.layout{grid-template-columns:1fr;padding:14px}.topbar{padding:15px}.foot{padding:0 14px 20px}}
 </style></head><body>
-<header class="topbar"><div><div class="brand">TikTok LIVE <span style="color:#a99afb">번역 자막 스튜디오</span></div><div class="sub">PUBLIC BROWSER VERSION · 개인 마이크 처리</div></div><span class="pill" id="topState">준비 중</span></header>
+<header class="topbar"><div><div class="brand">TikTok LIVE <span style="color:#a99afb">번역 자막 스튜디오</span></div><div class="sub">CLOUDFLARE WORKERS AI · WHISPER 음성인식</div></div><span class="pill" id="topState">준비 중</span></header>
 <main class="layout"><section>
-<div class="head"><div><h1 class="heading">실시간 번역 자막</h1><p class="muted">각 방문자의 브라우저에서 자기 마이크 음성을 인식하고 번역합니다.</p></div><span class="pill">브라우저 실행</span></div>
+<div class="head"><div><h1 class="heading">실시간 번역 자막</h1><p class="muted">마이크 오디오를 Cloudflare Workers AI Whisper로 보내 한국어로 인식한 뒤 번역합니다.</p></div><span class="pill">브라우저 실행</span></div>
 <div class="panel"><div class="head"><div><strong>방송 오버레이 미리보기</strong><div class="helper">오버레이 창을 LIVE Studio에서 창 캡처로 추가하세요.</div></div><button id="clearBtn">자막 지우기</button></div>
 <div class="preview" id="preview"><div class="line" data-line="ko"><span class="tag">KO</span><span id="pv-ko">마이크 입력 대기 중…</span></div><div class="line" data-line="en"><span class="tag">EN</span><span id="pv-en"></span></div><div class="line" data-line="zh-CN"><span class="tag">中文</span><span id="pv-zh-CN"></span></div><div class="line" data-line="ja"><span class="tag">日本語</span><span id="pv-ja"></span></div></div>
 <div class="toolbar"><button class="primary" id="startBtn">▶ 자막 시작</button><button id="stopBtn" disabled>■ 중지</button><button id="overlayBtn">↗ 오버레이 열기</button></div>
@@ -20,19 +20,21 @@
 <div class="panel"><strong>오버레이 배경 투명도</strong><div class="field"><label for="transparencyRange">투명도 <span id="transparencyValue">0%</span></label><input id="transparencyRange" type="range" min="0" max="100" step="5" value="0"><div class="helper">0%는 불투명한 검정 배경, 100%는 완전 투명 배경을 뜻합니다. 글자는 선명하게 유지됩니다.</div></div></div>
 <div class="panel"><strong>마이크 권한</strong><p class="helper">Chrome 또는 Edge에서 HTTPS 주소로 접속해야 합니다. 자막 시작을 누르고 브라우저의 마이크 권한을 허용하세요. 사용할 입력 장치는 브라우저/Windows의 기본 마이크 설정을 따릅니다.</p><button id="micHelp">마이크 설정 안내</button></div>
 <div class="panel"><strong>방 코드 · 여러 사용자 분리</strong><p class="helper">각 사용자는 기본적으로 서로 다른 방을 사용합니다. 같은 방송의 자막을 공유하려면 같은 방 코드를 입력하고, 별도 방송은 새 방을 만드세요.</p><div class="field"><label for="roomCodeInput">현재 방 코드</label><input id="roomCodeInput" type="text" autocomplete="off" maxlength="40" placeholder="예: room-a1b2c3d4"></div><div class="toolbar"><button id="joinRoomBtn" class="primary">이 방으로 입장</button><button id="newRoomBtn">새 방 만들기</button><button id="copyRoomBtn">방 코드 복사</button></div><p class="helper" id="roomStatus">방 코드가 다른 사용자는 서로의 자막을 볼 수 없습니다.</p></div><div class="panel"><strong>링크형 오버레이</strong><p class="helper">아래 주소를 복사해 TikTok LIVE Studio의 브라우저 소스 URL에 붙여넣으세요. 오버레이 링크에는 현재 방 코드가 포함됩니다.</p><div class="field"><label for="overlayLink">오버레이 URL</label><input id="overlayLink" type="text" readonly style="width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px"></div><div class="toolbar"><button id="copyOverlayLinkBtn" class="primary">링크 복사</button><button id="openOverlayLinkBtn">미리보기 열기</button></div><p class="helper" id="linkStatus">사이트 배포 후 이 주소를 복사해 사용하세요.</p></div><div class="panel"><strong>방송에 자막 넣기</strong><ol class="helper" style="padding-left:18px;line-height:1.9"><li>자막 시작을 누르고 마이크 권한을 허용합니다.</li><li>위의 오버레이 URL을 복사합니다.</li><li>TikTok LIVE Studio에서 브라우저 소스를 추가하고 URL에 붙여넣습니다.</li><li>브라우저 소스의 배경/크기 설정은 LIVE Studio에서 조절하세요.</li></ol></div>
-<div class="panel"><strong>중요 안내</strong><p class="helper">음성 인식은 브라우저의 Web Speech 기능을 사용합니다. Chrome/Edge 지원 여부와 인터넷 상태에 따라 달라질 수 있습니다. Google 번역 공개 엔드포인트만 사용합니다. 공식적으로 보장된 API가 아니므로 속도 제한이나 장애가 발생하면 번역이 실패할 수 있습니다. 동일 문장은 Worker 메모리 캐시에 30분간 보관해 반복 요청을 줄입니다. 여러 언어는 병렬로 번역해 대기 시간을 줄입니다. 사이트 운영자는 마이크 오디오를 자체 서버로 전송하지 않지만 브라우저 음성 인식 엔진의 처리 정책은 해당 브라우저 제공자에 따릅니다.</p></div>
-</aside></main><footer class="foot">이 웹사이트는 별도의 Python 서버 없이 정적 호스팅에서 동작하도록 제작되었습니다. 방문자별 자막과 설정은 각 브라우저 안에서 분리됩니다. 무료 번역 API는 무제한/상업적 서비스가 보장되지 않습니다.</footer>
+<div class="panel"><strong>중요 안내</strong><p class="helper">음성인식은 Cloudflare Workers AI의 Whisper large-v3-turbo 모델을 사용합니다. 마이크 오디오는 음성인식을 위해 Cloudflare Worker로 전송됩니다. Google 번역 공개 엔드포인트만 사용하며 공식적으로 보장된 API가 아니므로 속도 제한이나 장애가 발생할 수 있습니다. 동일 문장은 Worker 메모리 캐시에 30분간 보관해 반복 번역 요청을 줄입니다. Whisper 및 번역 API 사용량에 따라 비용이나 제한이 발생할 수 있습니다.</p></div>
+</aside></main><footer class="foot">이 웹사이트는 Cloudflare Workers 및 Workers AI를 사용합니다. 마이크 오디오는 음성인식을 위해 Cloudflare로 전송됩니다. 방문자별 자막 방은 방 코드로 분리됩니다. Workers AI와 공개 Google 번역 엔드포인트는 무제한 사용이 보장되지 않습니다.</footer>
 <script>
 const $ = (id) => document.getElementById(id);
-const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
 const LANGS = ['en', 'zh-CN', 'ja'];
 const ALL_LANGS = ['ko', ...LANGS];
 const LABELS = { en: '영어', 'zh-CN': '중국어', ja: '일본어' };
 const CACHE_LIMIT = 250;
-let recognition = null;
+let mediaStream = null;
+let recorder = null;
+let segmentTimer = null;
 let running = false;
-let shouldRestart = false;
-let restartTimer = null;
+let activeAudioBlob = null;
+let transcribeBusy = false;
+let pendingAudioBlob = null;
 let translationQueue = Promise.resolve();
 let translatedCount = 0;
 let translationJobId = 0;
@@ -190,7 +192,7 @@ async function translate(text, target) {
   let lastError;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, { method: 'GET' }, 9000);
+      const response = await fetchWithTimeout(url, { method: 'GET' }, 40000);
       const data = await response.json();
       if (!response.ok) {
         const detail = Array.isArray(data?.details) ? ' (' + data.details.join(' / ') + ')' : '';
@@ -246,110 +248,121 @@ function handleFinal(text, runId) {
   $('transcript').textContent = (clean + '\n' + (old === '아직 인식된 문장이 없습니다.' ? '' : old)).slice(0, 1800);
   enqueueTranslations(clean, runId);
 }
-function clearRestartTimer() {
-  if (restartTimer) clearTimeout(restartTimer);
-  restartTimer = null;
+function stopSegmentTimer() {
+  if (segmentTimer) clearTimeout(segmentTimer);
+  segmentTimer = null;
 }
-function scheduleRestart(runId) {
-  clearRestartTimer();
-  if (!shouldRestart || !running || runId !== activeRunId) return;
-  restartTimer = setTimeout(() => {
-    if (!shouldRestart || !running || runId !== activeRunId || !recognition) return;
-    try { recognition.start(); }
-    catch (_) { scheduleRestart(runId); }
-  }, 650);
+function startRecordingSegment(runId) {
+  if (!running || runId !== activeRunId || !mediaStream) return;
+  try {
+    const options = {};
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) options.mimeType = 'audio/webm;codecs=opus';
+    else if (MediaRecorder.isTypeSupported('audio/webm')) options.mimeType = 'audio/webm';
+    else if (MediaRecorder.isTypeSupported('audio/mp4')) options.mimeType = 'audio/mp4';
+    recorder = new MediaRecorder(mediaStream, options);
+    const chunks = [];
+    recorder.ondataavailable = (event) => { if (event.data && event.data.size) chunks.push(event.data); };
+    recorder.onerror = (event) => {
+      if (runId === activeRunId) safeStatus('녹음 오류', String(event.error?.message || '마이크 녹음 중 오류가 발생했습니다.'), 'error');
+    };
+    recorder.onstop = () => {
+      if (runId !== activeRunId) return;
+      const blob = new Blob(chunks, { type: recorder?.mimeType || 'audio/webm' });
+      if (blob.size > 1200) queueTranscription(blob, runId);
+      if (running && runId === activeRunId) startRecordingSegment(runId);
+    };
+    recorder.start();
+    safeStatus('Whisper 음성인식 중', '마이크 오디오를 약 6초 단위로 인식하고 있습니다.', 'good');
+    segmentTimer = setTimeout(() => {
+      if (recorder && recorder.state === 'recording') {
+        try { recorder.stop(); } catch (_) {}
+      }
+    }, 6000);
+  } catch (error) {
+    safeStatus('녹음 시작 실패', String(error?.message || error), 'error');
+    stop();
+  }
 }
-function start() {
-  if (!SpeechRecognitionAPI) {
+async function sendAudioForTranscription(blob, runId) {
+  const response = await fetchWithTimeout('/api/transcribe', {
+    method: 'POST',
+    headers: { 'Content-Type': blob.type || 'audio/webm' },
+    body: blob
+  }, 30000);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error((data?.error || `Whisper HTTP ${response.status}`) + (data?.details ? ` (${data.details})` : ''));
+  if (!running || runId !== activeRunId) return;
+  const text = String(data?.text || '').replace(/\s+/g, ' ').trim();
+  if (text) handleFinal(text, runId);
+}
+function queueTranscription(blob, runId) {
+  if (!running || runId !== activeRunId) return;
+  if (transcribeBusy) {
+    // Keep at most one waiting segment so slow inference does not create an unbounded queue.
+    pendingAudioBlob = blob;
+    return;
+  }
+  transcribeBusy = true;
+  (async () => {
+    let current = blob;
+    try {
+      while (current && running && runId === activeRunId) {
+        await sendAudioForTranscription(current, runId);
+        current = pendingAudioBlob;
+        pendingAudioBlob = null;
+      }
+    } catch (error) {
+      safeStatus('Whisper 음성인식 오류', String(error?.message || error), 'error');
+      pendingAudioBlob = null;
+    } finally {
+      transcribeBusy = false;
+    }
+  })();
+}
+async function start() {
+  if (running) return;
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
     safeStatus('브라우저 미지원', '최신 Chrome 또는 Edge에서 HTTPS 주소로 접속해 주세요.', 'error');
     return;
   }
-  if (running) return;
-  clearRestartTimer();
   activeRunId += 1;
   const runId = activeRunId;
   lastFinalText = '';
   lastFinalAt = 0;
-  recognition = new SpeechRecognitionAPI();
-  recognition.lang = 'ko-KR';
-  recognition.continuous = true;
-  recognition.interimResults = true;
-  recognition.maxAlternatives = 3;
-  shouldRestart = true;
-  running = true;
-  recognition.onstart = () => {
-    if (runId === activeRunId) safeStatus('마이크 인식 중', '한국어 음성을 듣고 있습니다.', 'good');
-  };
-  recognition.onresult = (event) => {
-    if (!running || runId !== activeRunId) return;
-    let interim = '';
-    for (let i = event.resultIndex; i < event.results.length; i++) {
-      const item = event.results[i];
-      const best = item && item.length ? Array.from(item).sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0))[0] : null;
-      const text = best && best.transcript ? best.transcript.trim() : '';
-      if (item.isFinal) handleFinal(text, runId);
-      else interim += text;
-    }
-    if (interim) $('topState').textContent = '인식 중: ' + interim.slice(0, 24);
-  };
-  recognition.onerror = (event) => {
-    if (runId !== activeRunId) return;
-    const code = event && event.error || 'unknown';
-    const messages = {
-      'not-allowed': '브라우저의 마이크 권한을 허용하세요.',
-      'service-not-allowed': '이 브라우저/계정에서 음성 인식 서비스가 차단되었습니다.',
-      'audio-capture': '마이크를 찾을 수 없습니다. Windows 기본 입력 장치를 확인하세요.',
-      'network': '브라우저 음성 인식 네트워크 오류입니다. 인터넷 연결을 확인하세요.',
-      'no-speech': '음성이 감지되지 않았습니다. 마이크 가까이에서 말해 보세요.',
-      'language-not-supported': '한국어 음성 인식이 지원되지 않습니다.'
-    };
-    safeStatus('음성 인식 알림', messages[code] || ('음성 인식 오류: ' + code), ['not-allowed','service-not-allowed','audio-capture','language-not-supported'].includes(code) ? 'error' : '');
-    if (['not-allowed', 'service-not-allowed', 'audio-capture', 'language-not-supported'].includes(code)) {
-      shouldRestart = false;
-      running = false;
-      clearRestartTimer();
-      $('startBtn').disabled = false;
-      $('stopBtn').disabled = true;
-    }
-  };
-  recognition.onend = () => {
-    if (runId !== activeRunId) return;
-    if (shouldRestart && running) scheduleRestart(runId);
-    else {
-      recognition = null;
-      $('startBtn').disabled = false;
-      $('stopBtn').disabled = true;
-    }
-  };
   try {
-    recognition.start();
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+    if (runId !== activeRunId) { mediaStream.getTracks().forEach(track => track.stop()); return; }
+    running = true;
+    pendingAudioBlob = null;
     $('startBtn').disabled = true;
     $('stopBtn').disabled = false;
     saveSettings();
+    startRecordingSegment(runId);
   } catch (error) {
-    shouldRestart = false;
     running = false;
-    recognition = null;
     $('startBtn').disabled = false;
     $('stopBtn').disabled = true;
-    safeStatus('시작 실패', String(error && error.message || error), 'error');
+    const message = error?.name === 'NotAllowedError' ? '브라우저의 마이크 권한을 허용하세요.' : String(error?.message || error);
+    safeStatus('마이크 시작 실패', message, 'error');
   }
 }
 function stop() {
-  shouldRestart = false;
   running = false;
   activeRunId += 1;
-  clearRestartTimer();
-  const oldRecognition = recognition;
-  recognition = null;
-  if (oldRecognition) {
-    oldRecognition.onend = null;
-    oldRecognition.onresult = null;
-    try { oldRecognition.stop(); } catch (_) { try { oldRecognition.abort(); } catch (_e) {} }
+  stopSegmentTimer();
+  pendingAudioBlob = null;
+  const oldRecorder = recorder;
+  recorder = null;
+  if (oldRecorder && oldRecorder.state !== 'inactive') {
+    try { oldRecorder.onstop = null; oldRecorder.stop(); } catch (_) {}
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(track => { try { track.stop(); } catch (_) {} });
+    mediaStream = null;
   }
   $('startBtn').disabled = false;
   $('stopBtn').disabled = true;
-  safeStatus('중지됨', '마이크 인식이 중지되었습니다.');
+  safeStatus('중지됨', '마이크 녹음과 Whisper 음성인식을 중지했습니다.');
 }
 $('startBtn').addEventListener('click', start);
 $('stopBtn').addEventListener('click', stop);
