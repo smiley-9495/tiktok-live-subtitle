@@ -152,7 +152,10 @@ async function translate(text, target) {
     try {
       const response = await fetchWithTimeout(url, { method: 'GET' }, 9000);
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.error || ('번역 서버 HTTP ' + response.status));
+      if (!response.ok) {
+        const detail = Array.isArray(data?.details) ? ' (' + data.details.join(' / ') + ')' : '';
+        throw new Error((data?.error || ('번역 서버 HTTP ' + response.status)) + detail);
+      }
       const result = String(data?.translatedText || '').trim();
       if (!result) throw new Error('번역 결과가 비어 있습니다.');
       cache.set(key, result);
@@ -187,7 +190,7 @@ function enqueueTranslations(text, runId) {
       }
     }
     $('reqCount').textContent = translatedCount + '회';
-    if (errors.length) safeStatus('일부 번역 실패', errors.join(' · '), 'error');
+    if (errors.length) safeStatus('일부 번역 실패', errors.join(' · ') + ' · 번역 API/네트워크를 확인하세요.', 'error');
     else if (completed.length) safeStatus('번역 완료', completed.join(' · ') + ' 번역 완료', 'good');
   }).catch((error) => safeStatus('번역 오류', String(error?.message || error), 'error'));
 }

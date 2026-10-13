@@ -7,6 +7,9 @@ export default {
       const allowedTargets = new Set(['en', 'zh-CN', 'ja']);
       if (!allowedTargets.has(target)) return Response.json({ error: '지원하지 않는 번역 언어입니다.' }, { status: 400 });
       if (!text || text.length > 450) return Response.json({ error: '번역 문장은 1~450자여야 합니다.' }, { status: 400 });
+
+      // Try Google's lightweight endpoint first; use MyMemory as a fallback if it is blocked or unavailable.
+      const errors = [];
       try {
         const endpoint = new URL('https://translate.googleapis.com/translate_a/single');
         endpoint.searchParams.set('client', 'gtx');
@@ -14,15 +17,46 @@ export default {
         endpoint.searchParams.set('tl', target);
         endpoint.searchParams.set('dt', 't');
         endpoint.searchParams.set('q', text);
-        const upstream = await fetch(endpoint.toString(), { headers: { 'Accept': 'application/json' } });
-        if (!upstream.ok) return Response.json({ error: '번역 제공 서버 오류', upstreamStatus: upstream.status }, { status: 502 });
+        const upstream = await fetch(endpoint.toString(), {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(7000)
+        });
+        if (!upstream.ok) throw new Error('Google HTTP ' + upstream.status);
         const result = await upstream.json();
-        const translatedText = Array.isArray(result?.[0]) ? result[0].map(part => Array.isArray(part) ? part[0] || '' : '').join('').trim() : '';
-        if (!translatedText) return Response.json({ error: '번역 결과가 비어 있습니다.' }, { status: 502 });
-        return Response.json({ translatedText, target }, { headers: { 'Cache-Control': 'no-store' } });
-      } catch (_) {
-        return Response.json({ error: '번역 서버에 연결할 수 없습니다.' }, { status: 502 });
+        const translatedText = Array.isArray(result?.[0])
+          ? result[0].map(part => Array.isArray(part) ? part[0] || '' : '').join('').trim()
+          : '';
+        if (!translatedText) throw new Error('Google returned an empty translation');
+        return Response.json({ translatedText, target, provider: 'google' }, {
+          headers: { 'Cache-Control': 'no-store' }
+        });
+      } catch (error) {
+        errors.push(String(error?.message || error));
       }
+
+      try {
+        const endpoint = new URL('https://api.mymemory.translated.net/get');
+        endpoint.searchParams.set('q', text);
+        endpoint.searchParams.set('langpair', 'ko|' + target);
+        const upstream = await fetch(endpoint.toString(), {
+          headers: { 'Accept': 'application/json', 'User-Agent': 'Mozilla/5.0' },
+          signal: AbortSignal.timeout(7000)
+        });
+        if (!upstream.ok) throw new Error('MyMemory HTTP ' + upstream.status);
+        const result = await upstream.json();
+        const translatedText = String(result?.responseData?.translatedText || '').trim();
+        const responseStatus = Number(result?.responseStatus || 0);
+        if (!translatedText || (responseStatus && responseStatus !== 200)) {
+          throw new Error(String(result?.responseDetails || 'MyMemory returned an empty translation'));
+        }
+        return Response.json({ translatedText, target, provider: 'mymemory' }, {
+          headers: { 'Cache-Control': 'no-store' }
+        });
+      } catch (error) {
+        errors.push(String(error?.message || error));
+      }
+
+      return Response.json({ error: '번역 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.', details: errors }, { status: 502 });
     }
     if (url.pathname.startsWith('/ws/')) {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
