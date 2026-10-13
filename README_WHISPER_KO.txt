@@ -21,3 +21,9 @@ Whisper 단독 다국어 음성인식 + 영어 번역 버전
 - 마이크 오디오는 처리를 위해 Cloudflare로 전송됩니다. Workers AI 사용량과 계정 한도가 적용됩니다.
 - 멀티룸, Durable Object 실시간 동기화, LIVE Studio 오버레이는 유지됩니다.
 - 코드 문법 및 ZIP 무결성 확인은 별도 수행해야 하며, 실제 Cloudflare 배포 및 계정에서의 마이크/AI 작동 테스트는 사용자가 배포 후 확인해야 합니다.
+
+
+[오디오 입력 형식 수정]
+- whisper-large-v3-turbo 모델은 audio 값을 Base64 문자열로 받습니다.
+- Worker에서 오디오 바이트를 Base64로 변환해 전달하도록 수정했습니다.
+- 수정 후 GitHub 저장소의 src/worker.js를 포함한 파일을 교체하고 새로 커밋/배포하세요.

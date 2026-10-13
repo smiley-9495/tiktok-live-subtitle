@@ -2,6 +2,17 @@
 // Whisper can recognize many source languages, but its built-in translate task outputs English only.
 const WHISPER_MODEL = '@cf/openai/whisper-large-v3-turbo';
 
+// whisper-large-v3-turbo expects audio as a Base64 string (not a number array).
+function bytesToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -20,11 +31,10 @@ export default {
       if (!['transcribe', 'translate', 'both'].includes(mode)) {
         return Response.json({ error: 'mode는 transcribe, translate, both 중 하나여야 합니다.' }, { status: 400 });
       }
-      // Workers AI Whisper accepts audio as an unsigned-byte array for this model.
-      // Do not send a base64/string value to this input shape.
-      const audioBytes = Array.from(new Uint8Array(audio));
+      // The large-v3-turbo model requires Base64 audio.
+      const audioBase64 = bytesToBase64(audio);
       const runWhisper = (task) => env.AI.run(WHISPER_MODEL, {
-        audio: audioBytes,
+        audio: audioBase64,
         task,
         // Intentionally omit language so Whisper can identify the source language automatically.
         vad_filter: true
