@@ -5,116 +5,25 @@ const translationCache = new Map();
 const translationInFlight = new Map();
 
 async function translateWithProviders(text, target, env) {
-  const errors = [];
-  // Primary: public LibreTranslate instances. No API key is needed on some instances;
-  // availability and rate limits depend on each instance. Set LIBRETRANSLATE_URL to override.
-  const libreTarget = ({ en: 'en', 'zh-CN': 'zh', ja: 'ja' })[target];
-  const configuredLibre = String(env.LIBRETRANSLATE_URL || '').trim();
-  const libreBases = configuredLibre
-    ? [configuredLibre]
-    : [
-        'https://translate.argosopentech.com',
-        'https://libretranslate.de',
-        'https://trans.zillyhuhn.com',
-        'https://translate.mentality.rip'
-      ];
-  for (const base of [...new Set(libreBases)]) {
-    try {
-      const endpoint = new URL(base.replace(/\/+$/, '') + (base.replace(/\/+$/, '').endsWith('/translate') ? '' : '/translate'));
-      const body = { q: text, source: 'ko', target: libreTarget, format: 'text' };
-      if (env.LIBRETRANSLATE_API_KEY) body.api_key = env.LIBRETRANSLATE_API_KEY;
-      const upstream = await fetch(endpoint.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(4500)
-      });
-      if (!upstream.ok) throw new Error('LibreTranslate ' + new URL(base).host + ' HTTP ' + upstream.status);
-      const data = await upstream.json();
-      const translatedText = String(data?.translatedText || '').trim();
-      if (!translatedText) throw new Error('LibreTranslate returned an empty translation');
-      return { translatedText, target, provider: 'libretranslate' };
-    } catch (error) { errors.push(String(error?.message || error)); }
-  }
+  // Google Translate public web endpoint only. Unofficial and may be rate-limited or changed.
+  const endpoint = new URL('https://translate.googleapis.com/translate_a/single');
+  endpoint.searchParams.set('client', 'gtx');
+  endpoint.searchParams.set('sl', 'ko');
+  endpoint.searchParams.set('tl', target);
+  endpoint.searchParams.set('dt', 't');
+  endpoint.searchParams.set('q', text);
 
-  // Fallback 1: official Google Cloud Translation (only if configured).
-  if (env.GOOGLE_TRANSLATE_API_KEY) {
-    try {
-      const endpoint = new URL('https://translation.googleapis.com/language/translate/v2');
-      endpoint.searchParams.set('key', env.GOOGLE_TRANSLATE_API_KEY);
-      const upstream = await fetch(endpoint.toString(), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'application/json' },
-        body: JSON.stringify({ q: [text], source: 'ko', target, format: 'text' }),
-        signal: AbortSignal.timeout(5500)
-      });
-      if (!upstream.ok) throw new Error('Google Cloud Translation HTTP ' + upstream.status);
-      const data = await upstream.json();
-      const translatedText = String(data?.data?.translations?.[0]?.translatedText || '').trim();
-      if (!translatedText) throw new Error('Google Cloud Translation returned an empty translation');
-      return { translatedText, target, provider: 'google-cloud-translation-fallback' };
-    } catch (error) { errors.push(String(error?.message || error)); }
-  }
-
-  // Fallback 2: official Microsoft Translator API (only if configured).
-  if (env.MICROSOFT_TRANSLATOR_KEY) {
-    try {
-      const microsoftTarget = ({ en: 'en', 'zh-CN': 'zh-Hans', ja: 'ja' })[target];
-      const endpoint = new URL('https://api.cognitive.microsofttranslator.com/translate');
-      endpoint.searchParams.set('api-version', '3.0'); endpoint.searchParams.set('from', 'ko'); endpoint.searchParams.set('to', microsoftTarget);
-      const headers = { 'Ocp-Apim-Subscription-Key': env.MICROSOFT_TRANSLATOR_KEY, 'Content-Type': 'application/json; charset=UTF-8', 'Accept': 'application/json' };
-      if (env.MICROSOFT_TRANSLATOR_REGION) headers['Ocp-Apim-Subscription-Region'] = env.MICROSOFT_TRANSLATOR_REGION;
-      const upstream = await fetch(endpoint.toString(), { method: 'POST', headers, body: JSON.stringify([{ Text: text }]), signal: AbortSignal.timeout(5500) });
-      if (!upstream.ok) throw new Error('Microsoft Translator HTTP ' + upstream.status);
-      const data = await upstream.json();
-      const translatedText = String(data?.[0]?.translations?.[0]?.text || '').trim();
-      if (!translatedText) throw new Error('Microsoft Translator returned an empty translation');
-      return { translatedText, target, provider: 'microsoft-translator-fallback' };
-    } catch (error) { errors.push(String(error?.message || error)); }
-  }
-
-  // Fallback 3: DeepL API Free (only if configured).
-  if (env.DEEPL_API_KEY) {
-    try {
-      const deeplTarget = ({ en: 'EN', 'zh-CN': 'ZH', ja: 'JA' })[target];
-      const upstream = await fetch('https://api-free.deepl.com/v2/translate', {
-        method: 'POST', headers: { 'Authorization': 'DeepL-Auth-Key ' + env.DEEPL_API_KEY, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        body: JSON.stringify({ text: [text], source_lang: 'KO', target_lang: deeplTarget }), signal: AbortSignal.timeout(5500)
-      });
-      if (!upstream.ok) throw new Error('DeepL HTTP ' + upstream.status);
-      const data = await upstream.json();
-      const translatedText = String(data?.translations?.[0]?.text || '').trim();
-      if (!translatedText) throw new Error('DeepL returned an empty translation');
-      return { translatedText, target, provider: 'deepl-fallback' };
-    } catch (error) { errors.push(String(error?.message || error)); }
-  }
-
-  // Compatibility fallback: unofficial Google endpoint; may be rate-limited.
-  try {
-    const endpoint = new URL('https://translate.googleapis.com/translate_a/single');
-    endpoint.searchParams.set('client', 'gtx'); endpoint.searchParams.set('sl', 'ko'); endpoint.searchParams.set('tl', target); endpoint.searchParams.set('dt', 't'); endpoint.searchParams.set('q', text);
-    const upstream = await fetch(endpoint.toString(), { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5500) });
-    if (!upstream.ok) throw new Error('Google public endpoint HTTP ' + upstream.status);
-    const data = await upstream.json();
-    const translatedText = Array.isArray(data?.[0]) ? data[0].map(part => Array.isArray(part) ? part[0] || '' : '').join('').trim() : '';
-    if (!translatedText) throw new Error('Google public endpoint returned an empty translation');
-    return { translatedText, target, provider: 'google-public-fallback' };
-  } catch (error) { errors.push(String(error?.message || error)); }
-
-  // Last fallback: MyMemory; subject to provider limits.
-  try {
-    const endpoint = new URL('https://api.mymemory.translated.net/get');
-    endpoint.searchParams.set('q', text); endpoint.searchParams.set('langpair', 'ko|' + target);
-    const upstream = await fetch(endpoint.toString(), { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(5500) });
-    if (!upstream.ok) throw new Error('MyMemory HTTP ' + upstream.status);
-    const data = await upstream.json();
-    const translatedText = String(data?.responseData?.translatedText || '').trim();
-    const responseStatus = Number(data?.responseStatus || 0);
-    if (!translatedText || (responseStatus && responseStatus !== 200)) throw new Error(String(data?.responseDetails || 'MyMemory returned an empty translation'));
-    return { translatedText, target, provider: 'mymemory-fallback' };
-  } catch (error) { errors.push(String(error?.message || error)); }
-
-  throw new Error(errors.join(' / ') || 'No translation provider is available');
+  const upstream = await fetch(endpoint.toString(), {
+    headers: { 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(5000)
+  });
+  if (!upstream.ok) throw new Error('Google public endpoint HTTP ' + upstream.status);
+  const data = await upstream.json();
+  const translatedText = Array.isArray(data?.[0])
+    ? data[0].map(part => Array.isArray(part) ? part[0] || '' : '').join('').trim()
+    : '';
+  if (!translatedText) throw new Error('Google public endpoint returned an empty translation');
+  return { translatedText, target, provider: 'google-public' };
 }
 
 export default {
