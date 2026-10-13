@@ -20,7 +20,7 @@
 <div class="panel"><strong>오버레이 배경 투명도</strong><div class="field"><label for="transparencyRange">투명도 <span id="transparencyValue">0%</span></label><input id="transparencyRange" type="range" min="0" max="100" step="5" value="0"><div class="helper">0%는 불투명한 검정 배경, 100%는 완전 투명 배경을 뜻합니다. 글자는 선명하게 유지됩니다.</div></div></div>
 <div class="panel"><strong>마이크 권한</strong><p class="helper">Chrome 또는 Edge에서 HTTPS 주소로 접속해야 합니다. 자막 시작을 누르고 브라우저의 마이크 권한을 허용하세요. 사용할 입력 장치는 브라우저/Windows의 기본 마이크 설정을 따릅니다.</p><button id="micHelp">마이크 설정 안내</button></div>
 <div class="panel"><strong>링크형 오버레이</strong><p class="helper">아래 주소를 복사해 TikTok LIVE Studio의 브라우저 소스 URL에 붙여넣으세요. 사이트와 방송 소스가 같은 방 코드를 통해 실시간 자막을 공유합니다.</p><div class="field"><label for="overlayLink">오버레이 URL</label><input id="overlayLink" type="text" readonly style="width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);border-radius:10px;padding:11px"></div><div class="toolbar"><button id="copyOverlayLinkBtn" class="primary">링크 복사</button><button id="openOverlayLinkBtn">미리보기 열기</button></div><p class="helper" id="linkStatus">사이트 배포 후 이 주소를 복사해 사용하세요.</p></div><div class="panel"><strong>방송에 자막 넣기</strong><ol class="helper" style="padding-left:18px;line-height:1.9"><li>자막 시작을 누르고 마이크 권한을 허용합니다.</li><li>위의 오버레이 URL을 복사합니다.</li><li>TikTok LIVE Studio에서 브라우저 소스를 추가하고 URL에 붙여넣습니다.</li><li>브라우저 소스의 배경/크기 설정은 LIVE Studio에서 조절하세요.</li></ol></div>
-<div class="panel"><strong>중요 안내</strong><p class="helper">음성 인식은 브라우저의 Web Speech 기능을 사용합니다. Chrome/Edge 지원 여부와 인터넷 상태에 따라 달라질 수 있습니다. 번역은 무료 공개 MyMemory API를 사용하므로 사용량 제한, 지연 또는 장애가 발생할 수 있습니다. 사이트 운영자는 마이크 오디오를 자체 서버로 전송하지 않지만 브라우저 음성 인식 엔진의 처리 정책은 해당 브라우저 제공자에 따릅니다.</p></div>
+<div class="panel"><strong>중요 안내</strong><p class="helper">음성 인식은 브라우저의 Web Speech 기능을 사용합니다. Chrome/Edge 지원 여부와 인터넷 상태에 따라 달라질 수 있습니다. 번역은 Cloudflare Worker를 통해 Google 번역 엔드포인트를 호출합니다. 여러 언어는 병렬로 번역해 대기 시간을 줄이며, 공개 번역 엔드포인트의 정책·속도 제한·장애에 영향을 받을 수 있습니다. 사이트 운영자는 마이크 오디오를 자체 서버로 전송하지 않지만 브라우저 음성 인식 엔진의 처리 정책은 해당 브라우저 제공자에 따릅니다.</p></div>
 </aside></main><footer class="foot">이 웹사이트는 별도의 Python 서버 없이 정적 호스팅에서 동작하도록 제작되었습니다. 방문자별 자막과 설정은 각 브라우저 안에서 분리됩니다. 무료 번역 API는 무제한/상업적 서비스가 보장되지 않습니다.</footer>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -29,14 +29,13 @@ const LANGS = ['en', 'zh-CN', 'ja'];
 const ALL_LANGS = ['ko', ...LANGS];
 const LABELS = { en: '영어', 'zh-CN': '중국어', ja: '일본어' };
 const CACHE_LIMIT = 250;
-const MIN_TRANSLATION_GAP_MS = 1100;
 let recognition = null;
 let running = false;
 let shouldRestart = false;
 let restartTimer = null;
 let translationQueue = Promise.resolve();
 let translatedCount = 0;
-let lastRequestAt = 0;
+let translationJobId = 0;
 let lastFinalText = '';
 let lastFinalAt = 0;
 let activeRunId = 0;
@@ -147,55 +146,50 @@ async function translate(text, target) {
   if (!cleanText) return '';
   const key = target + '|' + cleanText;
   if (cache.has(key)) return cache.get(key);
-  const waitMs = MIN_TRANSLATION_GAP_MS - (Date.now() - lastRequestAt);
-  if (waitMs > 0) await sleep(waitMs);
-  lastRequestAt = Date.now();
-  const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(cleanText) + '&langpair=' + encodeURIComponent('ko|' + target);
+  const url = '/api/translate?target=' + encodeURIComponent(target) + '&q=' + encodeURIComponent(cleanText);
   let lastError;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const response = await fetchWithTimeout(url, {}, 14000);
-      if (response.status === 429) throw new Error('무료 번역 요청 한도(429)에 도달했습니다. 잠시 뒤 다시 시도하세요.');
-      if (!response.ok) throw new Error('번역 서버 HTTP ' + response.status);
+      const response = await fetchWithTimeout(url, { method: 'GET' }, 9000);
       const data = await response.json();
-      const apiStatus = Number(data && data.responseStatus);
-      if (apiStatus && apiStatus !== 200) {
-        const detail = String(data.responseDetails || '번역 서비스에서 오류를 반환했습니다.');
-        throw new Error(detail);
-      }
-      const result = decodeEntities(data && data.responseData && data.responseData.translatedText).trim();
+      if (!response.ok) throw new Error(data?.error || ('번역 서버 HTTP ' + response.status));
+      const result = String(data?.translatedText || '').trim();
       if (!result) throw new Error('번역 결과가 비어 있습니다.');
       cache.set(key, result);
       if (cache.size > CACHE_LIMIT) cache.delete(cache.keys().next().value);
       return result;
     } catch (error) {
       lastError = error;
-      const message = String(error && error.message || error);
-      if (message.includes('429') || message.toLowerCase().includes('limit') || attempt === 1) break;
-      await sleep(700);
+      if (attempt === 1) break;
+      await sleep(250);
     }
   }
   throw lastError || new Error('번역에 실패했습니다.');
 }
 function enqueueTranslations(text, runId) {
-  translationQueue = translationQueue.then(async () => {
-    const targets = [...document.querySelectorAll('[data-lang]:checked')].map((el) => el.dataset.lang).filter((lang) => LANGS.includes(lang));
-    for (const target of targets) {
-      if (!running || runId !== activeRunId) return;
-      try {
-        const result = await translate(text, target);
-        if (!running || runId !== activeRunId) return;
-        renderLine(target, result);
+  const jobId = ++translationJobId;
+  const targets = [...document.querySelectorAll('[data-lang]:checked')].map((el) => el.dataset.lang).filter((lang) => LANGS.includes(lang));
+  if (!targets.length) return;
+  // Translate the selected languages concurrently rather than waiting for each language in turn.
+  Promise.allSettled(targets.map(async (target) => ({ target, result: await translate(text, target) }))).then((results) => {
+    if (!running || runId !== activeRunId || jobId !== translationJobId) return;
+    const completed = [];
+    const errors = [];
+    for (let i = 0; i < results.length; i++) {
+      const item = results[i];
+      const target = targets[i];
+      if (item.status === 'fulfilled') {
+        renderLine(target, item.value.result);
+        completed.push(LABELS[target]);
         translatedCount += 1;
-        $('reqCount').textContent = translatedCount + '회';
-        safeStatus('번역 완료', LABELS[target] + ' 번역을 완료했습니다.', 'good');
-      } catch (error) {
-        const message = String(error && error.message || error);
-        safeStatus('번역 오류', LABELS[target] + ': ' + message, 'error');
-        if (message.includes('429') || message.toLowerCase().includes('limit') || message.includes('한도')) return;
+      } else {
+        errors.push(LABELS[target] + ': ' + String(item.reason?.message || item.reason));
       }
     }
-  }).catch((error) => safeStatus('번역 오류', String(error && error.message || error), 'error'));
+    $('reqCount').textContent = translatedCount + '회';
+    if (errors.length) safeStatus('일부 번역 실패', errors.join(' · '), 'error');
+    else if (completed.length) safeStatus('번역 완료', completed.join(' · ') + ' 번역 완료', 'good');
+  }).catch((error) => safeStatus('번역 오류', String(error?.message || error), 'error'));
 }
 function handleFinal(text, runId) {
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
@@ -237,7 +231,7 @@ function start() {
   recognition.lang = 'ko-KR';
   recognition.continuous = true;
   recognition.interimResults = true;
-  recognition.maxAlternatives = 1;
+  recognition.maxAlternatives = 3;
   shouldRestart = true;
   running = true;
   recognition.onstart = () => {
@@ -248,7 +242,8 @@ function start() {
     let interim = '';
     for (let i = event.resultIndex; i < event.results.length; i++) {
       const item = event.results[i];
-      const text = item && item[0] ? item[0].transcript.trim() : '';
+      const best = item && item.length ? Array.from(item).sort((a, b) => (Number(b.confidence) || 0) - (Number(a.confidence) || 0))[0] : null;
+      const text = best && best.transcript ? best.transcript.trim() : '';
       if (item.isFinal) handleFinal(text, runId);
       else interim += text;
     }

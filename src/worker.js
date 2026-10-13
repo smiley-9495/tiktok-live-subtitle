@@ -1,6 +1,29 @@
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === '/api/translate' && request.method === 'GET') {
+      const target = url.searchParams.get('target') || '';
+      const text = (url.searchParams.get('q') || '').trim();
+      const allowedTargets = new Set(['en', 'zh-CN', 'ja']);
+      if (!allowedTargets.has(target)) return Response.json({ error: '지원하지 않는 번역 언어입니다.' }, { status: 400 });
+      if (!text || text.length > 450) return Response.json({ error: '번역 문장은 1~450자여야 합니다.' }, { status: 400 });
+      try {
+        const endpoint = new URL('https://translate.googleapis.com/translate_a/single');
+        endpoint.searchParams.set('client', 'gtx');
+        endpoint.searchParams.set('sl', 'ko');
+        endpoint.searchParams.set('tl', target);
+        endpoint.searchParams.set('dt', 't');
+        endpoint.searchParams.set('q', text);
+        const upstream = await fetch(endpoint.toString(), { headers: { 'Accept': 'application/json' } });
+        if (!upstream.ok) return Response.json({ error: '번역 제공 서버 오류', upstreamStatus: upstream.status }, { status: 502 });
+        const result = await upstream.json();
+        const translatedText = Array.isArray(result?.[0]) ? result[0].map(part => Array.isArray(part) ? part[0] || '' : '').join('').trim() : '';
+        if (!translatedText) return Response.json({ error: '번역 결과가 비어 있습니다.' }, { status: 502 });
+        return Response.json({ translatedText, target }, { headers: { 'Cache-Control': 'no-store' } });
+      } catch (_) {
+        return Response.json({ error: '번역 서버에 연결할 수 없습니다.' }, { status: 502 });
+      }
+    }
     if (url.pathname.startsWith('/ws/')) {
       if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
         return new Response('WebSocket upgrade required', { status: 426 });
