@@ -1,29 +1,23 @@
-Cloudflare Workers AI Whisper 적용 버전
+Whisper 단독 다국어 음성인식 + 영어 번역 버전
 
-이 버전은 기존 Web Speech API 음성인식을 제거하고, 브라우저 마이크 오디오를 Cloudflare Worker로 보내 Workers AI Whisper로 한국어 텍스트로 변환합니다. 인식 결과는 기존 Google 공개 번역 스크립트로 전달됩니다. Google 번역 외의 번역 서비스는 추가하지 않았습니다.
+이 버전은 Google 번역, MyMemory, LibreTranslate 등 모든 외부 번역 서비스를 제거했습니다. 음성인식과 영어 번역 모두 Cloudflare Workers AI Whisper 모델만 사용합니다.
 
-주요 파일
-- public/index.html: 마이크 녹음, 약 6초 단위 오디오 전송, 번역 UI
-- public/overlay.html: TikTok LIVE Studio용 오버레이
-- src/worker.js: /api/transcribe Whisper 처리, /api/translate Google 공개 번역, Durable Object 멀티룸
-- wrangler.toml: Workers AI binding 설정 포함
+지원 방식
+- 원문 자막: Whisper가 입력 음성의 언어를 자동 감지해 해당 언어로 받아쓰기합니다. 한국어, 영어, 일본어, 중국어 등 여러 입력 언어를 인식할 수 있습니다.
+- 영어 번역: Whisper의 task=translate 기능으로 입력 음성을 영어로 번역합니다.
+- 한계: Whisper 내장 translate 작업은 영어 출력용입니다. Whisper만 사용하면서 한국어를 중국어/일본어 등 임의의 목표 언어로 번역하는 것은 지원되지 않습니다. 영어 이외의 목표 언어가 필요하면 별도 번역 모델/API가 필요합니다.
 
-GitHub + Cloudflare 적용
-1. ZIP을 풀고 파일 전체를 기존 GitHub 저장소 루트에 덮어씁니다. package.json, wrangler.toml, src, public가 저장소 루트에 있어야 합니다.
-2. GitHub에 커밋합니다.
-3. Cloudflare Worker가 해당 GitHub 저장소에서 배포되도록 연결되어 있다면 자동 배포를 기다리거나 Cloudflare 대시보드에서 재배포합니다.
-4. wrangler.toml에 [ai] binding = "AI" 설정이 포함되어 있어야 합니다. 이 ZIP에는 포함되어 있습니다.
-5. 배포한 HTTPS 주소를 Chrome/Edge에서 열고 마이크 권한을 허용한 뒤 자막 시작을 누릅니다.
-6. 기존 방 코드와 오버레이 링크 사용 방식은 유지됩니다.
+설치
+1. ZIP 압축을 풉니다. package.json, wrangler.toml, src, public가 저장소 루트에 있어야 합니다.
+2. 기존 GitHub 저장소 파일을 덮어쓰고 커밋합니다.
+3. Cloudflare Workers에서 재배포합니다.
+4. wrangler.toml의 [ai] binding = \"AI\" 설정을 유지합니다.
+5. HTTPS 주소로 접속해 마이크 권한을 허용하고 자막 시작을 누릅니다.
 
-동작 및 한계
-- Whisper는 약 6초 단위로 오디오를 처리하므로 브라우저 Web Speech API보다 지연이 발생할 수 있습니다. 네트워크와 모델 처리 시간에 따라 지연은 달라집니다.
-- 처리 속도가 느릴 때 오디오가 무한히 쌓이지 않도록 대기 오디오는 최대 1개만 보관합니다. 이 때문에 처리 속도가 녹음보다 느리면 일부 구간이 생략될 수 있습니다.
-- 마이크 오디오는 음성인식을 위해 Cloudflare로 전송됩니다. 이전 브라우저 내 음성인식 방식과 개인정보 처리 특성이 다릅니다.
-- Workers AI 사용량에 따라 과금 또는 계정 한도가 적용될 수 있습니다. Cloudflare 대시보드에서 현재 가격과 사용량을 확인하세요.
-- Google 번역은 공개 비공식 엔드포인트만 사용하므로 HTTP 429 등 제한이 발생할 수 있습니다. 이를 줄이기 위해 Worker 인스턴스 내 요청 간격을 1.5초로 늘리고, 번역 작업을 직렬화하며, 429 응답은 대기 후 최대 3회 시도하도록 조정했습니다. 브라우저 번역 요청 타임아웃도 40초로 늘렸습니다. 이는 제한을 우회하거나 완전히 없애는 방법은 아니며, 서로 다른 Worker 인스턴스 사이의 전역 제한도 아닙니다.
-- 이 ZIP은 코드 문법과 압축 무결성만 검사했습니다. 실제 Cloudflare 배포, 마이크 녹음, Workers AI 실행 및 LIVE Studio 동작은 사용자의 계정에서 테스트해야 합니다.
-
-
-오디오 입력 형식 오류(5006) 수정 안내
-- 이 버전은 @cf/openai/whisper 모델에 Uint8Array를 숫자 배열로 전달합니다. Base64 문자열로 전달하면 모델 입력 스키마에 따라 5006 형식 오류가 발생할 수 있습니다.
+기술 사항
+- public/index.html은 마이크 오디오를 약 6초 구간으로 녹음해 /api/transcribe?mode=both로 보냅니다. 원문 또는 영어만 선택하면 해당 Whisper 작업만 실행해 사용량을 줄입니다.
+- src/worker.js는 @cf/openai/whisper-large-v3-turbo를 호출합니다. source language를 강제로 ko로 지정하지 않아 자동 감지를 사용합니다.
+- Whisper 원문 인식과 영어 번역을 동시에 선택하면 같은 오디오 구간에 대해 두 번의 Workers AI 모델 실행이 발생합니다. 따라서 사용량/비용이 증가할 수 있습니다.
+- 마이크 오디오는 처리를 위해 Cloudflare로 전송됩니다. Workers AI 사용량과 계정 한도가 적용됩니다.
+- 멀티룸, Durable Object 실시간 동기화, LIVE Studio 오버레이는 유지됩니다.
+- 코드 문법 및 ZIP 무결성 확인은 별도 수행해야 하며, 실제 Cloudflare 배포 및 계정에서의 마이크/AI 작동 테스트는 사용자가 배포 후 확인해야 합니다.

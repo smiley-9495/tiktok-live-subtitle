@@ -1,46 +1,30 @@
-TikTok LIVE 번역 자막 - 링크형 오버레이 버전
+TikTok LIVE 자막 - Whisper 단독 다국어 인식 + 영어 번역
 
-이 버전은 방송 프로그램의 브라우저 소스에 오버레이 URL을 직접 붙여넣을 수 있도록, Cloudflare Worker + Durable Object 실시간 전달 서버를 포함합니다. 정적 Pages에 HTML만 올리는 기존 방식과 달리 Worker 배포가 필요합니다.
+이 프로젝트는 Cloudflare Worker + Durable Object 실시간 전달 서버와 링크형 오버레이를 포함합니다. Google 번역 및 외부 번역 서비스는 호출하지 않습니다.
 
-파일
-- public/index.html : 자막 설정/음성 인식/번역 페이지
-- public/overlay.html : 브라우저 소스용 오버레이 페이지
-- src/worker.js : WebSocket 실시간 자막 중계 + Durable Object 방(room)
-- wrangler.toml : Cloudflare 배포 설정
+기능
+- Whisper가 음성의 원어를 자동 감지해 원문 자막 생성
+- Whisper의 내장 translate 작업으로 영어 자막 생성
+- 원문/영어 자막 각각 ON/OFF
+- 방 코드별 실시간 자막 분리 및 공유
+- TikTok LIVE Studio 브라우저 소스용 오버레이 URL
+- 오버레이 배경 투명도 조절
 
-배포 방법 (무료 사용량 내에서 우선 운영)
-1. Node.js LTS를 설치합니다: https://nodejs.org/
-2. 이 폴더에서 터미널/명령 프롬프트를 엽니다.
-3. `npm install` 을 실행합니다.
-4. `npx wrangler login` 을 실행하고 Cloudflare 계정에 로그인합니다.
-5. `npx wrangler deploy` 를 실행합니다.
-6. 배포 완료 메시지에 표시된 https://...workers.dev 주소를 엽니다.
-7. 사이트 본 화면에서 `자막 시작`을 누르고 마이크 권한을 허용합니다.
-8. `오버레이 URL` 항목의 `링크 복사`를 누릅니다.
-9. TikTok LIVE Studio에서 브라우저 소스를 추가하고 URL 칸에 붙여넣습니다.
+중요한 한계
+Whisper는 다국어 음성을 인식하지만, 내장 translate 작업의 번역 출력은 영어입니다. Whisper만으로 한국어를 중국어/일본어 등 임의의 목표 언어로 번역할 수는 없습니다. 영어 외 목표 언어가 필요하면 별도의 다국어 번역 모델/API가 필요합니다.
 
-실시간 연결 방식
-- 본 화면과 오버레이 URL은 같은 room ID를 사용합니다.
-- 기본 방은 브라우저마다 별도로 생성됩니다. 별도 방송은 `새 방 만들기`를 누르고, 같은 자막을 공유할 사람에게 방 코드를 알려주세요. 다른 사용자는 그 코드를 입력해 `이 방으로 입장`하면 됩니다.
-- 방을 바꾸면 오버레이 URL도 해당 방 코드로 자동 변경됩니다. LIVE Studio의 브라우저 소스 URL도 새 링크로 교체해야 합니다.
-- 자막/설정은 WebSocket으로 Cloudflare Worker Durable Object에 전달됩니다.
-- 브라우저 소스는 별도 브라우저 프로필이어도 같은 링크의 room에 접속해 자막을 받습니다.
-- room ID는 URL에 포함되므로, 링크를 아는 사람은 그 방의 자막을 볼 수 있습니다. 방송에 쓰는 동안만 공유하세요.
+배포 (내 PC에 Node.js 설치하지 않는 방식)
+1. ZIP 압축을 풀고 package.json, wrangler.toml, src, public가 저장소 최상위에 있는지 확인합니다.
+2. GitHub 저장소의 파일을 덮어쓰고 커밋합니다.
+3. Cloudflare에서 해당 GitHub 저장소를 연결해 배포합니다. 빌드 설정은 프로젝트 구성에 맞게 `npm install` 및 `npm run deploy`를 사용합니다.
+4. wrangler.toml의 [ai] binding = "AI" 설정과 Durable Object 설정을 유지합니다.
+5. 배포된 HTTPS 주소를 Chrome/Edge에서 열고 마이크 권한을 허용합니다.
+6. 자막 시작을 누르고 오버레이 URL을 TikTok LIVE Studio의 브라우저 소스에 넣습니다.
 
-주의
-- 실제 배포와 TikTok LIVE Studio 내 동작은 계정/환경에 따라 확인이 필요합니다. 오류가 절대 발생하지 않는다고 보장할 수는 없습니다.
-- 음성 인식은 Cloudflare Workers AI Whisper large-v3-turbo 모델을 사용합니다. 마이크 오디오는 음성인식을 위해 Cloudflare Worker로 전송됩니다. Chrome/Edge에서 HTTPS 접속과 마이크 권한이 필요합니다.
-- 이 버전은 Google 번역 공개 엔드포인트만 사용합니다. 공식적으로 보장된 API가 아니므로 요청 제한, 지연, 장애가 발생할 수 있습니다. 무료 공개 번역 엔드포인트는 요청 제한, 지연, 장애가 발생할 수 있습니다.
-- Cloudflare 무료 사용량 한도/상품 정책은 변경될 수 있습니다. 이용자가 많아지면 요금과 사용량을 확인하세요.
-- 링크를 알고 있는 다른 사람이 같은 room으로 메시지를 보낼 수 있으므로 민감한 내용을 자막 처리하지 마세요.
+비용/개인정보
+- 원문과 영어를 모두 선택하면 오디오 구간마다 Whisper 모델을 두 번 호출하므로 Workers AI 사용량이 증가합니다. 한 언어만 선택하면 해당 작업만 실행합니다.
+- 마이크 오디오는 처리를 위해 Cloudflare로 전송됩니다. Workers AI 계정 사용량/한도/가격을 확인하세요.
+- 오버레이 링크의 방 코드를 아는 사람은 해당 방의 자막을 볼 수 있으므로 링크를 공개 게시판에 올리지 마세요.
 
-
-Microsoft Translator 우선 설정은 README_MICROSOFT_TRANSLATOR_KO.txt를 확인하세요. Microsoft API 키는 GitHub에 넣지 말고 Cloudflare Secret MICROSOFT_TRANSLATOR_KEY로 설정하세요.
-
-Google Cloud Translation + 캐시 설정: README_GOOGLE_CLOUD_TRANSLATION_KO.txt를 확인하세요.
-
-
-Google 번역 스크립트 단독 사용 버전입니다. 다른 번역 서비스로 대체하지 않습니다. 비공식 공개 엔드포인트라 속도 제한이나 변경이 있을 수 있으며, 실패하면 번역 요청이 실패합니다.
-
-
-Whisper 적용 방법과 주의사항은 README_WHISPER_KO.txt를 확인하세요.
+검증 안내
+ZIP 무결성 및 코드 문법은 검사할 수 있지만, 실제 Cloudflare 계정 배포, Workers AI 모델 실행, 마이크 및 TikTok LIVE Studio 연동은 배포 후 직접 확인해야 합니다.
