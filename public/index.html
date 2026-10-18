@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>자막 컨트롤 · 한국어 → 일본어/중국어/영어</title>
+<style>
+:root{--bg:#12141a;--panel:#1b1e26;--line:#313744;--text:#eceff4;--muted:#9aa3b2;--accent:#ffd23f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 "Pretendard","Noto Sans KR","Malgun Gothic",sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 20px 48px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media(max-width:760px){main{grid-template-columns:1fr}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+h1{font-size:20px;margin:0 0 4px;grid-column:1/-1}
+h2{font-size:15px;margin:0 0 12px}
+.sub{color:var(--muted);margin:0 0 4px;grid-column:1/-1}
+.row{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.row>label,.lab{color:var(--muted);font-size:13px;display:flex;justify-content:space-between}
+.checks{display:flex;gap:16px;flex-wrap:wrap}
+.checks label{display:flex;gap:6px;align-items:center;cursor:pointer}
+select,input[type=text],button{font:inherit;color:var(--text);background:#0e1015;border:1px solid var(--line);border-radius:6px;padding:9px;width:100%}
+button{cursor:pointer}
+button.primary{background:var(--accent);color:#1a1500;border-color:var(--accent);font-weight:700}
+input[type=range]{accent-color:var(--accent);width:100%}
+.btns{display:flex;gap:8px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#status{margin:0 0 14px;color:var(--muted)}
+#status.live{color:#6ee7a0}#status.err{color:#ff8f8f}
+#preview{background:#000 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16'%3E%3Crect width='8' height='8' fill='%23151515'/%3E%3Crect x='8' y='8' width='8' height='8' fill='%23151515'/%3E%3C/svg%3E");
+  border-radius:8px;min-height:190px;padding:14px;text-align:center}
+#preview div{margin:4px 0;font-weight:700;min-height:1.4em}
+.hint{color:var(--muted);font-size:13px;margin:12px 0 0}
+.hint b{color:var(--text);font-weight:600}
+.wide{grid-column:1/-1}
+</style>
+</head>
+<body>
+<main>
+  <h1>실시간 자막 컨트롤</h1>
+  <p class="sub">한국어 음성을 인식해 일본어·중국어·영어로 번역하고, 오버레이 주소로 내보냅니다.</p>
+
+  <section>
+    <h2>방송 제어</h2>
+    <p id="status">대기 중</p>
+    <p id="conn" style="margin:0 0 14px;color:var(--muted)"></p>
+    <div class="row"><label for="room">방 이름 (오버레이 주소에 들어감)</label><input type="text" id="room"></div>
+    <div class="row"><label for="key">제어 키 (Cloudflare에 등록한 CONTROL_KEY)</label><input type="password" id="key" autocomplete="off"></div>
+
+    <div class="btns row">
+      <button id="toggle" class="primary">자막 시작</button>
+      <button id="clear">지우기</button>
+    </div>
+    <div class="row">
+      <span class="lab">번역 언어 (한국어는 항상 표시)</span>
+      <div class="checks">
+        <label><input type="checkbox" id="ja"> 日本語</label>
+        <label><input type="checkbox" id="zh"> 中文</label>
+        <label><input type="checkbox" id="en"> English</label>
+      </div>
+    </div>
+    <div class="row">
+      <label class="checks"><input type="checkbox" id="live"> 말하는 도중에도 번역 (빠르지만 번역이 바뀔 수 있음)</label>
+    </div>
+    <div class="row"><label for="segs">표시할 문장 수 <span id="segsV"></span></label><input id="segs" type="range" min="1" max="3"></div>
+    <div class="row"><label for="hold">무음 후 사라지기 <span id="holdV"></span></label><input id="hold" type="range" min="2" max="12"></div>
+  </section>
+
+  <section>
+    <h2>미리보기</h2>
+    <div id="preview">
+      <div id="p-ko" style="color:#fff"></div>
+      <div id="p-ja" style="color:#ffe8a3"></div>
+      <div id="p-zh" style="color:#c9f5c0"></div>
+      <div id="p-en" style="color:#bfe3ff"></div>
+    </div>
+  </section>
+
+  <section class="wide">
+    <h2>오버레이 주소</h2>
+    <div class="row">
+      <div class="btns"><input type="text" id="url" readonly><button id="copy" style="width:110px">복사</button></div>
+    </div>
+    <div class="btns">
+      <div class="row" style="flex:1"><label for="size">글자 크기 <span id="sizeV"></span></label><input id="size" type="range" min="20" max="90"></div>
+      <div class="row" style="flex:1"><label for="bgop">배경 농도 <span id="bgopV"></span></label><input id="bgop" type="range" min="0" max="100" step="5"></div>
+      <div class="row" style="flex:1"><label for="pos">위치</label>
+        <select id="pos"><option value="bottom">아래</option><option value="middle">가운데</option><option value="top">위</option></select></div>
+    </div>
+    <p class="hint"><b>틱톡 라이브 스튜디오</b>: 소스 추가 → <b>링크(Link)</b> → 위 주소 붙여넣기 → 소스 크기를 방송 해상도에 맞추세요. 안 보이면 OBS 브라우저 소스 + OBS 가상 카메라를 쓰세요. 이 페이지(크롬)는 방송 중 계속 켜 두어야 합니다.</p>
+  </section>
+</main>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var def = { room: "main", key: "", ja: true, zh: true, en: true, live: true, segs: 2, hold: 5, size: 40, bgop: 55, pos: "bottom" };
+  var cfg = Object.assign({}, def);
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem("cap-ko-v2") || "{}")); } catch (e) {}
+
+  function save() { try { localStorage.setItem("cap-ko-v2", JSON.stringify(cfg)); } catch (e) {} }
+  function targets() { return ["ja", "zh", "en"].filter(function (l) { return cfg[l]; }); }
+
+  var overlayBase = location.origin;
+
+  function refreshUrl() {
+    $("segsV").textContent = cfg.segs + "문장";
+    $("holdV").textContent = cfg.hold + "초";
+    $("sizeV").textContent = cfg.size + "px";
+    $("bgopV").textContent = cfg.bgop + "%";
+    $("url").value = overlayBase + "/overlay?room=" + encodeURIComponent(cfg.room) + "&langs=" + ["ko"].concat(targets()).join(",") +
+      "&size=" + cfg.size + "&pos=" + cfg.pos + "&bgop=" + cfg.bgop + "&hold=" + cfg.hold;
+  }
+
+  ["ja", "zh", "en", "live"].forEach(function (k) {
+    $(k).checked = !!cfg[k];
+    $(k).addEventListener("change", function () { cfg[k] = $(k).checked; save(); refreshUrl(); push(); });
+  });
+  ["segs", "hold", "size", "bgop"].forEach(function (k) {
+    $(k).value = cfg[k];
+    $(k).addEventListener("input", function () { cfg[k] = +$(k).value; save(); refreshUrl(); });
+  });
+  $("pos").value = cfg.pos;
+  $("pos").addEventListener("change", function () { cfg.pos = $("pos").value; save(); refreshUrl(); });
+  $("copy").addEventListener("click", function () {
+    $("url").select();
+    try { document.execCommand("copy"); $("copy").textContent = "복사됨"; setTimeout(function () { $("copy").textContent = "복사"; }, 1200); } catch (e) {}
+  });
+
+  function setStatus(m, c) { $("status").textContent = m; $("status").className = c || ""; }
+
+  /* ---------- 번역 ---------- */
+  var GL = { ja: "ja", zh: "zh-CN", en: "en" }, cache = {};
+  function translate(text, l) {
+    var key = l + "|" + text;
+    if (cache[key] !== undefined) return Promise.resolve(cache[key]);
+    var u = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=" + GL[l] + "&dt=t&q=" + encodeURIComponent(text);
+    return fetch(u).then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+      .then(function (j) { return j[0].map(function (x) { return x[0]; }).join(""); })
+      .catch(function () {
+        return fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=ko|" + GL[l])
+          .then(function (r) { return r.json(); })
+          .then(function (j) { return j.responseData.translatedText; });
+      })
+      .then(function (t) { cache[key] = t; return t; });
+  }
+  function trErr() { setStatus("번역 서버 응답 오류 (잠시 후 자동 재시도)", "err"); }
+
+  /* ---------- 서버 연결 (WebSocket) ---------- */
+  var ws = null, pingTimer = null;
+  function setConn(m, c) { $("conn").textContent = m; $("conn").className = c || ""; }
+  function connect() {
+    if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} ws = null; }
+    clearInterval(pingTimer);
+    if (!cfg.key) { setConn("제어 키를 입력하세요", "err"); return; }
+    var w;
+    try {
+      w = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host +
+        "/ws?role=control&room=" + encodeURIComponent(cfg.room) + "&key=" + encodeURIComponent(cfg.key));
+    } catch (e) { return; }
+    ws = w;
+    w.onopen = function () {
+      setConn("서버 연결됨", "live");
+      pingTimer = setInterval(function () { try { w.send("ping"); } catch (e) {} }, 30000);
+    };
+    w.onclose = function () {
+      clearInterval(pingTimer);
+      setConn("서버 연결 끊김 (제어 키가 맞는지 확인) — 재연결 중…", "err");
+      setTimeout(function () { if (ws === w) connect(); }, 2500);
+    };
+  }
+  ["room", "key"].forEach(function (k) {
+    $(k).value = cfg[k];
+    $(k).addEventListener("change", function () { cfg[k] = $(k).value.trim() || (k === "room" ? "main" : ""); save(); refreshUrl(); connect(); });
+  });
+
+  /* ---------- 자막 상태 ---------- */
+  var segs = [], interim = { ko: "", tr: {} }, holdTimer = null, itimer = null, lastIK = "";
+
+  function build() {
+    var vis = segs.slice(-cfg.segs), out = { ko: "", ja: "", zh: "", en: "" };
+    var ko = vis.map(function (s) { return s.ko; });
+    if (interim.ko) ko.push(interim.ko);
+    out.ko = ko.join(" ");
+    targets().forEach(function (l) {
+      var a = vis.map(function (s) { return s.tr[l] || ""; }).filter(Boolean);
+      if (interim.tr[l]) a.push(interim.tr[l]);
+      out[l] = a.join(" ");
+    });
+    return out;
+  }
+
+  function push() {
+    var out = build();
+    ["ko", "ja", "zh", "en"].forEach(function (l) { $("p-" + l).textContent = out[l]; });
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(out));
+  }
+
+  function clearAll() { segs = []; interim = { ko: "", tr: {} }; lastIK = ""; push(); }
+  function resetHold() { clearTimeout(holdTimer); holdTimer = setTimeout(clearAll, cfg.hold * 1000); }
+
+  function finalize(t) {
+    var seg = { ko: t, tr: {} };
+    segs.push(seg);
+    if (segs.length > 20) segs.shift();
+    interim = { ko: "", tr: {} };
+    lastIK = "";
+    targets().forEach(function (l) {
+      translate(t, l).then(function (x) { seg.tr[l] = x; push(); }).catch(trErr);
+    });
+  }
+
+  function schedInterim() {
+    if (!cfg.live || itimer || !interim.ko) return;
+    itimer = setTimeout(function () {
+      itimer = null;
+      var k = interim.ko;
+      if (!k || k === lastIK) return;
+      lastIK = k;
+      targets().forEach(function (l) {
+        translate(k, l).then(function (t) { if (interim.ko === k) { interim.tr[l] = t; push(); } }).catch(trErr);
+      });
+    }, 600);
+  }
+
+  /* ---------- 음성 인식 ---------- */
+  var rec = null, running = false;
+
+  function start() {
+    if (!SR) { setStatus("이 브라우저는 음성 인식을 지원하지 않습니다. 크롬을 사용하세요.", "err"); return; }
+    rec = new SR();
+    rec.lang = "ko-KR";
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.onstart = function () { setStatus("듣는 중…", "live"); };
+    rec.onresult = function (e) {
+      var im = "";
+      for (var i = e.resultIndex; i < e.results.length; i++) {
+        var r = e.results[i], t = r[0].transcript.trim();
+        if (r.isFinal) { if (t) finalize(t); } else im += t + " ";
+      }
+      interim.ko = im.trim();
+      if (!interim.ko) interim.tr = {};
+      push(); schedInterim(); resetHold();
+    };
+    rec.onerror = function (e) {
+      if (e.error === "no-speech" || e.error === "aborted") return;
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        running = false; $("toggle").textContent = "자막 시작";
+        setStatus("마이크 권한을 허용해 주세요 (주소창 왼쪽 아이콘 → 마이크 허용). \"이번에만 허용\"이 아니라 \"항상 허용\"을 선택하세요.", "err");
+      } else setStatus("음성 인식 오류: " + e.error, "err");
+    };
+    rec.onend = function () { if (running) { setTimeout(function () { if (running) { try { rec.start(); } catch (e) {} } }, 300); } };
+    running = true;
+    try { rec.start(); } catch (e) {}
+    $("toggle").textContent = "자막 중지";
+  }
+  function stop() {
+    running = false;
+    if (rec) { try { rec.stop(); } catch (e) {} }
+    $("toggle").textContent = "자막 시작";
+    setStatus("대기 중");
+    clearAll();
+  }
+
+  $("toggle").addEventListener("click", function () { running ? stop() : start(); });
+  $("clear").addEventListener("click", clearAll);
+  if (!SR) setStatus("크롬에서 열어 주세요 (음성 인식 미지원 브라우저).", "err");
+  refreshUrl();
+  connect();
+})();
+</script>
+</body>
+</html>

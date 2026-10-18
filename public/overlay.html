@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>자막 오버레이</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic","Noto Sans JP","Yu Gothic","Noto Sans SC","Microsoft YaHei",sans-serif}
+#wrap{position:absolute;left:0;right:0;padding:2% 4%;text-align:center;opacity:1;
+  -webkit-transition:opacity .25s;transition:opacity .25s}
+#wrap.hide{opacity:0}
+.row{margin:.1em 0}
+.row.off{display:none}
+.line{display:inline;padding:.04em .45em;border-radius:.25em;font-weight:700;line-height:1.55;
+  -webkit-box-decoration-break:clone;box-decoration-break:clone;
+  text-shadow:0 2px 5px rgba(0,0,0,.85);word-break:keep-all;overflow-wrap:break-word}
+.row.tr .line{font-size:.84em;font-weight:600}
+</style>
+</head>
+<body>
+<div id="wrap" class="hide"></div>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var langs = (q.get("langs") || "ko,ja,zh,en").split(",");
+  var size = +q.get("size") || 40;
+  var pos = q.get("pos") || "bottom";
+  var bgop = q.get("bgop") === null ? 55 : +q.get("bgop");
+  var hold = +q.get("hold") || 5;
+  var room = q.get("room") || "main";
+
+  var COLOR = { ko: "#ffffff", ja: "#ffe8a3", zh: "#c9f5c0", en: "#bfe3ff" };
+  var LANG = { ko: "ko", ja: "ja", zh: "zh-CN", en: "en" };
+
+  var wrap = document.getElementById("wrap");
+  wrap.style.fontSize = size + "px";
+  if (pos === "top") wrap.style.top = "0";
+  else if (pos === "middle") { wrap.style.top = "50%"; wrap.style.webkitTransform = wrap.style.transform = "translateY(-50%)"; }
+  else wrap.style.bottom = "0";
+
+  var rows = {};
+  langs.forEach(function (l) {
+    if (!COLOR[l]) return;
+    var row = document.createElement("div");
+    row.className = "row off" + (l === "ko" ? "" : " tr");
+    var span = document.createElement("span");
+    span.className = "line";
+    span.lang = LANG[l];
+    span.style.color = COLOR[l];
+    span.style.background = "rgba(0,0,0," + (bgop / 100) + ")";
+    row.appendChild(span);
+    wrap.appendChild(row);
+    rows[l] = { row: row, span: span };
+  });
+
+  var lastId = -1, hideTimer = null;
+
+  function apply(s) {
+    if (s.id === lastId) return;
+    lastId = s.id;
+    var any = false;
+    for (var l in rows) {
+      var t = s[l] || "";
+      rows[l].span.textContent = t;
+      rows[l].row.className = "row" + (l === "ko" ? "" : " tr") + (t ? "" : " off");
+      if (t) any = true;
+    }
+    clearTimeout(hideTimer);
+    if (any) {
+      wrap.className = "";
+      hideTimer = setTimeout(function () { wrap.className = "hide"; }, hold * 1000);
+    } else {
+      wrap.className = "hide";
+    }
+  }
+
+  var seq = 0, retry = 1000;
+  function connect() {
+    var ws;
+    try {
+      ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host +
+        "/ws?role=view&room=" + encodeURIComponent(room));
+    } catch (e) { setTimeout(connect, 3000); return; }
+    var ping = null;
+    ws.onopen = function () { retry = 1000; ping = setInterval(function () { try { ws.send("ping"); } catch (e) {} }, 30000); };
+    ws.onmessage = function (ev) {
+      if (ev.data === "pong") return;
+      try { var s = JSON.parse(ev.data); s.id = ++seq; apply(s); } catch (e) {}
+    };
+    ws.onclose = function () { clearInterval(ping); setTimeout(connect, retry); retry = Math.min(retry * 2, 10000); };
+  }
+  connect();
+})();
+</script>
+</body>
+</html>
