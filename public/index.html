@@ -43,8 +43,6 @@ input[type=range]{accent-color:var(--accent);width:100%}
     <h2>방송 제어</h2>
     <p id="status">대기 중</p>
     <p id="conn" style="margin:0 0 14px;color:var(--muted)"></p>
-    <div class="row"><label for="room">방 이름 (오버레이 주소에 들어감)</label><input type="text" id="room"></div>
-    <div class="row"><label for="key">제어 키 (Cloudflare에 등록한 CONTROL_KEY)</label><input type="password" id="key" autocomplete="off"></div>
 
     <div class="btns row">
       <button id="toggle" class="primary">자막 시작</button>
@@ -76,9 +74,10 @@ input[type=range]{accent-color:var(--accent);width:100%}
   </section>
 
   <section class="wide">
-    <h2>오버레이 주소</h2>
+    <h2>내 전용 오버레이 주소</h2>
+    <p class="hint" style="margin:0 0 10px">이 브라우저마다 자동으로 만들어지는 나만의 주소예요. 다른 사람과 섞이지 않으니 주소를 남에게 알려주지 마세요.</p>
     <div class="row">
-      <div class="btns"><input type="text" id="url" readonly><button id="copy" style="width:110px">복사</button></div>
+      <div class="btns"><input type="text" id="url" readonly><button id="copy" style="width:90px">복사</button><button id="newRoom" style="width:150px">새 주소 만들기</button></div>
     </div>
     <div class="btns">
       <div class="row" style="flex:1"><label for="size">글자 크기 <span id="sizeV"></span></label><input id="size" type="range" min="20" max="90"></div>
@@ -94,11 +93,19 @@ input[type=range]{accent-color:var(--accent);width:100%}
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var def = { room: "main", key: "", ja: true, zh: true, en: true, live: true, segs: 2, hold: 5, size: 40, bgop: 55, pos: "bottom" };
+  var def = { room: "", ja: true, zh: true, en: true, live: true, segs: 2, hold: 5, size: 40, bgop: 55, pos: "bottom" };
   var cfg = Object.assign({}, def);
-  try { Object.assign(cfg, JSON.parse(localStorage.getItem("cap-ko-v2") || "{}")); } catch (e) {}
+  try { Object.assign(cfg, JSON.parse(localStorage.getItem("cap-ko-v3") || "{}")); } catch (e) {}
 
-  function save() { try { localStorage.setItem("cap-ko-v2", JSON.stringify(cfg)); } catch (e) {} }
+  function genRoom() {
+    var a = new Uint8Array(20), s = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", r = "";
+    crypto.getRandomValues(a);
+    for (var i = 0; i < a.length; i++) r += s[a[i] % 62];
+    return r;
+  }
+  if (!/^[A-Za-z0-9_-]{12,64}$/.test(cfg.room || "")) cfg.room = genRoom();
+
+  function save() { try { localStorage.setItem("cap-ko-v3", JSON.stringify(cfg)); } catch (e) {} }
   function targets() { return ["ja", "zh", "en"].filter(function (l) { return cfg[l]; }); }
 
   var overlayBase = location.origin;
@@ -108,20 +115,25 @@ input[type=range]{accent-color:var(--accent);width:100%}
     $("holdV").textContent = cfg.hold + "초";
     $("sizeV").textContent = cfg.size + "px";
     $("bgopV").textContent = cfg.bgop + "%";
-    $("url").value = overlayBase + "/overlay?room=" + encodeURIComponent(cfg.room) + "&langs=" + ["ko"].concat(targets()).join(",") +
-      "&size=" + cfg.size + "&pos=" + cfg.pos + "&bgop=" + cfg.bgop + "&hold=" + cfg.hold;
+    $("url").value = overlayBase + "/overlay?room=" + encodeURIComponent(cfg.room);
   }
 
-  ["ja", "zh", "en", "live"].forEach(function (k) {
+  ["ja", "zh", "en"].forEach(function (k) {
     $(k).checked = !!cfg[k];
-    $(k).addEventListener("change", function () { cfg[k] = $(k).checked; save(); refreshUrl(); push(); });
+    $(k).addEventListener("change", function () { cfg[k] = $(k).checked; save(); onLangChange(); });
   });
+  $("live").checked = !!cfg.live;
+  $("live").addEventListener("change", function () { cfg.live = $("live").checked; save(); });
   ["segs", "hold", "size", "bgop"].forEach(function (k) {
     $(k).value = cfg[k];
-    $(k).addEventListener("input", function () { cfg[k] = +$(k).value; save(); refreshUrl(); });
+    $(k).addEventListener("input", function () { cfg[k] = +$(k).value; save(); refreshUrl(); push(); });
   });
   $("pos").value = cfg.pos;
-  $("pos").addEventListener("change", function () { cfg.pos = $("pos").value; save(); refreshUrl(); });
+  $("pos").addEventListener("change", function () { cfg.pos = $("pos").value; save(); push(); });
+  $("newRoom").addEventListener("click", function () {
+    if (!confirm("새 주소를 만들면 틱톡에 넣어 둔 기존 주소는 더 이상 작동하지 않아요. 계속할까요?")) return;
+    cfg.room = genRoom(); save(); refreshUrl(); connect();
+  });
   $("copy").addEventListener("click", function () {
     $("url").select();
     try { document.execCommand("copy"); $("copy").textContent = "복사됨"; setTimeout(function () { $("copy").textContent = "복사"; }, 1200); } catch (e) {}
@@ -148,31 +160,27 @@ input[type=range]{accent-color:var(--accent);width:100%}
 
   /* ---------- 서버 연결 (WebSocket) ---------- */
   var ws = null, pingTimer = null;
-  function setConn(m, c) { $("conn").textContent = m; $("conn").className = c || ""; }
+  function setConn(m, k) { $("conn").textContent = m; $("conn").className = k || ""; }
   function connect() {
     if (ws) { ws.onclose = null; try { ws.close(); } catch (e) {} ws = null; }
     clearInterval(pingTimer);
-    if (!cfg.key) { setConn("제어 키를 입력하세요", "err"); return; }
     var w;
     try {
       w = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host +
-        "/ws?role=control&room=" + encodeURIComponent(cfg.room) + "&key=" + encodeURIComponent(cfg.key));
+        "/ws?role=control&room=" + encodeURIComponent(cfg.room));
     } catch (e) { return; }
     ws = w;
     w.onopen = function () {
       setConn("서버 연결됨", "live");
       pingTimer = setInterval(function () { try { w.send("ping"); } catch (e) {} }, 30000);
+      push();
     };
     w.onclose = function () {
       clearInterval(pingTimer);
-      setConn("서버 연결 끊김 (제어 키가 맞는지 확인) — 재연결 중…", "err");
+      setConn("서버 연결 끊김 — 재연결 중…", "err");
       setTimeout(function () { if (ws === w) connect(); }, 2500);
     };
   }
-  ["room", "key"].forEach(function (k) {
-    $(k).value = cfg[k];
-    $(k).addEventListener("change", function () { cfg[k] = $(k).value.trim() || (k === "room" ? "main" : ""); save(); refreshUrl(); connect(); });
-  });
 
   /* ---------- 자막 상태 ---------- */
   var segs = [], interim = { ko: "", tr: {} }, holdTimer = null, itimer = null, lastIK = "";
@@ -193,8 +201,18 @@ input[type=range]{accent-color:var(--accent);width:100%}
   function push() {
     var out = build();
     ["ko", "ja", "zh", "en"].forEach(function (l) { $("p-" + l).textContent = out[l]; });
+    out.cfg = { size: cfg.size, pos: cfg.pos, bgop: cfg.bgop, hold: cfg.hold };
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(out));
   }
+
+  function fillMissing() {
+    segs.slice(-cfg.segs).forEach(function (seg) {
+      targets().forEach(function (l) {
+        if (seg.tr[l] === undefined) translate(seg.ko, l).then(function (x) { seg.tr[l] = x; push(); }).catch(trErr);
+      });
+    });
+  }
+  function onLangChange() { lastIK = ""; interim.tr = {}; fillMissing(); schedInterim(); push(); }
 
   function clearAll() { segs = []; interim = { ko: "", tr: {} }; lastIK = ""; push(); }
   function resetHold() { clearTimeout(holdTimer); holdTimer = setTimeout(clearAll, cfg.hold * 1000); }
