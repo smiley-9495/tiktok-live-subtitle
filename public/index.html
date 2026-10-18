@@ -58,6 +58,8 @@ input[type=range]{accent-color:var(--accent);width:100%}
     </div>
     <div class="row">
       <label class="checks"><input type="checkbox" id="live"> 말하는 도중에도 번역 (빠르지만 번역이 바뀔 수 있음)</label>
+      <label class="checks"><input type="checkbox" id="sync"> 세 언어 동시에 표시 (끄면 먼저 끝난 언어부터 바로 표시, 더 빠름)</label>
+      <span id="lat" class="hint" style="margin:0"></span>
     </div>
     <div class="row"><label for="segs">표시할 문장 수 <span id="segsV"></span></label><input id="segs" type="range" min="1" max="3"></div>
     <div class="row"><label for="hold">무음 후 사라지기 <span id="holdV"></span></label><input id="hold" type="range" min="2" max="12"></div>
@@ -85,6 +87,10 @@ input[type=range]{accent-color:var(--accent);width:100%}
       <div class="row" style="flex:1"><label for="pos">위치</label>
         <select id="pos"><option value="bottom">아래</option><option value="middle">가운데</option><option value="top">위</option></select></div>
     </div>
+    <div class="btns">
+      <div class="row" style="flex:1"><label for="lines">최대 줄 수 (넘치면 오래된 말부터 사라짐) <span id="linesV"></span></label><input id="lines" type="range" min="1" max="4"></div>
+      <div class="row" style="flex:1"><label for="width">자막 폭 (좁을수록 줄바꿈이 빨라짐) <span id="widthV"></span></label><input id="width" type="range" min="40" max="100" step="5"></div>
+    </div>
     <p class="hint"><b>틱톡 라이브 스튜디오</b>: 소스 추가 → <b>링크(Link)</b> → 위 주소 붙여넣기 → 소스 크기를 방송 해상도에 맞추세요. 안 보이면 OBS 브라우저 소스 + OBS 가상 카메라를 쓰세요. 이 페이지(크롬)는 방송 중 계속 켜 두어야 합니다.</p>
   </section>
 </main>
@@ -93,7 +99,7 @@ input[type=range]{accent-color:var(--accent);width:100%}
 (function () {
   var $ = function (id) { return document.getElementById(id); };
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  var def = { room: "", ja: true, zh: true, en: true, live: true, segs: 2, hold: 5, size: 40, bgop: 55, pos: "bottom" };
+  var def = { room: "", ja: true, zh: true, en: true, live: true, segs: 2, hold: 5, size: 40, bgop: 55, pos: "bottom", lines: 2, width: 90, sync: true };
   var cfg = Object.assign({}, def);
   try { Object.assign(cfg, JSON.parse(localStorage.getItem("cap-ko-v3") || "{}")); } catch (e) {}
 
@@ -115,6 +121,8 @@ input[type=range]{accent-color:var(--accent);width:100%}
     $("holdV").textContent = cfg.hold + "초";
     $("sizeV").textContent = cfg.size + "px";
     $("bgopV").textContent = cfg.bgop + "%";
+    $("linesV").textContent = cfg.lines + "줄";
+    $("widthV").textContent = cfg.width + "%";
     $("url").value = overlayBase + "/overlay?room=" + encodeURIComponent(cfg.room);
   }
 
@@ -122,9 +130,11 @@ input[type=range]{accent-color:var(--accent);width:100%}
     $(k).checked = !!cfg[k];
     $(k).addEventListener("change", function () { cfg[k] = $(k).checked; save(); onLangChange(); });
   });
+  $("sync").checked = !!cfg.sync;
+  $("sync").addEventListener("change", function () { cfg.sync = $("sync").checked; save(); });
   $("live").checked = !!cfg.live;
   $("live").addEventListener("change", function () { cfg.live = $("live").checked; save(); });
-  ["segs", "hold", "size", "bgop"].forEach(function (k) {
+  ["segs", "hold", "size", "bgop", "lines", "width"].forEach(function (k) {
     $(k).value = cfg[k];
     $(k).addEventListener("input", function () { cfg[k] = +$(k).value; save(); refreshUrl(); push(); });
   });
@@ -143,20 +153,22 @@ input[type=range]{accent-color:var(--accent);width:100%}
 
   /* ---------- 번역 ---------- */
   var GL = { ja: "ja", zh: "zh-CN", en: "en" }, cache = {};
-  function translate(text, l) {
+  function translate(text, l, signal) {
     var key = l + "|" + text;
     if (cache[key] !== undefined) return Promise.resolve(cache[key]);
+    var opt = signal ? { signal: signal } : {};
     var u = "https://translate.googleapis.com/translate_a/single?client=gtx&sl=ko&tl=" + GL[l] + "&dt=t&q=" + encodeURIComponent(text);
-    return fetch(u).then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
+    return fetch(u, opt).then(function (r) { if (!r.ok) throw new Error("http"); return r.json(); })
       .then(function (j) { return j[0].map(function (x) { return x[0]; }).join(""); })
-      .catch(function () {
-        return fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=ko|" + GL[l])
+      .catch(function (e) {
+        if (e && e.name === "AbortError") throw e;
+        return fetch("https://api.mymemory.translated.net/get?q=" + encodeURIComponent(text) + "&langpair=ko|" + GL[l], opt)
           .then(function (r) { return r.json(); })
           .then(function (j) { return j.responseData.translatedText; });
       })
       .then(function (t) { cache[key] = t; return t; });
   }
-  function trErr() { setStatus("번역 서버 응답 오류 (잠시 후 자동 재시도)", "err"); }
+  function trErr(e) { if (e && e.name === "AbortError") return; setStatus("번역 서버 응답 오류 (잠시 후 자동 재시도)", "err"); }
 
   /* ---------- 서버 연결 (WebSocket) ---------- */
   var ws = null, pingTimer = null;
@@ -201,15 +213,36 @@ input[type=range]{accent-color:var(--accent);width:100%}
   function push() {
     var out = build();
     ["ko", "ja", "zh", "en"].forEach(function (l) { $("p-" + l).textContent = out[l]; });
-    out.cfg = { size: cfg.size, pos: cfg.pos, bgop: cfg.bgop, hold: cfg.hold };
+    out.cfg = { size: cfg.size, pos: cfg.pos, bgop: cfg.bgop, hold: cfg.hold, lines: cfg.lines, width: cfg.width };
     if (ws && ws.readyState === 1) ws.send(JSON.stringify(out));
   }
 
+  // 선택한 언어를 병렬 번역. 동시 표시 ON: 모두 끝나면(최대 1.2초) 한 번에 / OFF: 먼저 끝난 언어부터 즉시
+  var latAvg = 0;
+  function noteLat(ms) {
+    latAvg = latAvg ? latAvg * 0.7 + ms * 0.3 : ms;
+    $("lat").textContent = "번역 지연 약 " + Math.round(latAvg) + "ms";
+  }
+  function translateAll(text, ls, apply, signal) {
+    var got = 0, done = false, out = {}, tm = null, t0 = Date.now();
+    function flush() { if (done) return; done = true; clearTimeout(tm); noteLat(Date.now() - t0); apply(out); }
+    if (!ls.length) return;
+    if (cfg.sync) tm = setTimeout(flush, 1200);
+    ls.forEach(function (l) {
+      translate(text, l, signal).then(function (x) { out[l] = x; }, trErr).then(function () {
+        if (signal && signal.aborted) return;
+        if (!cfg.sync || done) {
+          if (out[l] !== undefined) { var o = {}; o[l] = out[l]; apply(o); if (!cfg.sync && ++got === ls.length) noteLat(Date.now() - t0); }
+        } else if (++got === ls.length) flush();
+      });
+    });
+  }
+  function merge(dst, src) { for (var k in src) dst[k] = src[k]; }
+
   function fillMissing() {
     segs.slice(-cfg.segs).forEach(function (seg) {
-      targets().forEach(function (l) {
-        if (seg.tr[l] === undefined) translate(seg.ko, l).then(function (x) { seg.tr[l] = x; push(); }).catch(trErr);
-      });
+      var need = targets().filter(function (l) { return seg.tr[l] === undefined; });
+      translateAll(seg.ko, need, function (o) { merge(seg.tr, o); push(); });
     });
   }
   function onLangChange() { lastIK = ""; interim.tr = {}; fillMissing(); schedInterim(); push(); }
@@ -219,26 +252,28 @@ input[type=range]{accent-color:var(--accent);width:100%}
 
   function finalize(t) {
     var seg = { ko: t, tr: {} };
+    abortInterim();
+    merge(seg.tr, interim.tr);   // 번역이 도착할 때까지 직전 중간 번역을 임시로 유지 (깜빡임 방지)
     segs.push(seg);
     if (segs.length > 20) segs.shift();
     interim = { ko: "", tr: {} };
     lastIK = "";
-    targets().forEach(function (l) {
-      translate(t, l).then(function (x) { seg.tr[l] = x; push(); }).catch(trErr);
-    });
+    translateAll(t, targets(), function (o) { merge(seg.tr, o); push(); });
   }
-
+  var lastIT = 0, iAbort = null;
+  function abortInterim() { if (iAbort) { iAbort.abort(); iAbort = null; } }
   function schedInterim() {
     if (!cfg.live || itimer || !interim.ko) return;
+    var wait = Math.max(0, 250 - (Date.now() - lastIT));
     itimer = setTimeout(function () {
       itimer = null;
       var k = interim.ko;
       if (!k || k === lastIK) return;
-      lastIK = k;
-      targets().forEach(function (l) {
-        translate(k, l).then(function (t) { if (interim.ko === k) { interim.tr[l] = t; push(); } }).catch(trErr);
-      });
-    }, 600);
+      lastIK = k; lastIT = Date.now();
+      abortInterim();
+      iAbort = window.AbortController ? new AbortController() : null;
+      translateAll(k, targets(), function (o) { if (interim.ko === k) { merge(interim.tr, o); push(); } }, iAbort && iAbort.signal);
+    }, wait);
   }
 
   /* ---------- 음성 인식 ---------- */

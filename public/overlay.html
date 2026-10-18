@@ -27,7 +27,9 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
     size: +q.get("size") || 40,
     pos: q.get("pos") || "bottom",
     bgop: q.get("bgop") === null ? 55 : +q.get("bgop"),
-    hold: +q.get("hold") || 5
+    hold: +q.get("hold") || 5,
+    lines: +q.get("lines") || 2,
+    width: +q.get("width") || 90
   };
 
   var COLOR = { ko: "#ffffff", ja: "#ffe8a3", zh: "#c9f5c0", en: "#bfe3ff" };
@@ -50,6 +52,8 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
 
   function applyCfg() {
     wrap.style.fontSize = cfg.size + "px";
+    var pad = Math.max(0, (100 - cfg.width) / 2);
+    wrap.style.paddingLeft = wrap.style.paddingRight = pad + "%";
     wrap.style.top = wrap.style.bottom = "auto";
     wrap.style.webkitTransform = wrap.style.transform = "none";
     if (cfg.pos === "top") wrap.style.top = "0";
@@ -59,21 +63,31 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
   }
   applyCfg();
 
-  var hideTimer = null;
-  function apply(s) {
-    if (s.cfg) {
-      cfg.size = +s.cfg.size || cfg.size;
-      cfg.pos = s.cfg.pos || cfg.pos;
-      cfg.bgop = s.cfg.bgop === undefined ? cfg.bgop : +s.cfg.bgop;
-      cfg.hold = +s.cfg.hold || cfg.hold;
-      applyCfg();
+  var hideTimer = null, last = null;
+
+  // 줄 수 제한: 넘치면 앞쪽(오래된 말)부터 잘라내 최신 내용만 남김
+  function fit(l, text) {
+    var span = rows[l].span;
+    span.textContent = text;
+    if (span.getClientRects().length <= cfg.lines) return;
+    var cjk = (l === "ja" || l === "zh");
+    var u = cjk ? Array.from(text) : text.split(" "), sep = cjk ? "" : " ";
+    var lo = 0, hi = u.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      span.textContent = u.slice(mid).join(sep);
+      if (span.getClientRects().length <= cfg.lines) hi = mid; else lo = mid + 1;
     }
+    span.textContent = u.slice(lo).join(sep);
+  }
+
+  function render() {
+    if (!last) return;
     var any = false;
     ORDER.forEach(function (l) {
-      var t = s[l] || "";
-      rows[l].span.textContent = t;
+      var t = last[l] || "";
       rows[l].row.className = "row" + (l === "ko" ? "" : " tr") + (t ? "" : " off");
-      if (t) any = true;
+      if (t) { fit(l, t); any = true; } else rows[l].span.textContent = "";
     });
     clearTimeout(hideTimer);
     if (any) {
@@ -82,6 +96,20 @@ html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden
     } else {
       wrap.className = "hide";
     }
+  }
+
+  function apply(s) {
+    if (s.cfg) {
+      cfg.size = +s.cfg.size || cfg.size;
+      cfg.pos = s.cfg.pos || cfg.pos;
+      cfg.bgop = s.cfg.bgop === undefined ? cfg.bgop : +s.cfg.bgop;
+      cfg.hold = +s.cfg.hold || cfg.hold;
+      cfg.lines = +s.cfg.lines || cfg.lines;
+      cfg.width = +s.cfg.width || cfg.width;
+      applyCfg();
+    }
+    last = s;
+    render();
   }
 
   var retry = 1000;
